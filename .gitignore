@@ -1,0 +1,49 @@
+# 敏感配置(含 API Key)
+backend/.env
+.env
+*.env
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.pytest_cache/
+
+# Node / 前端
+node_modules/
+frontend/dist/
+frontend/.vite/
+npm-debug.log*
+
+# 生成的产物(视频/图片/音频/临时文件)
+storage/images/
+storage/audio/
+storage/videos/
+storage/clips/
+storage/*.mp4
+storage/*.png
+storage/*.wav
+storage/audit/
+
+# 调试预览 HTML
+storage/videos/*.html
+storage/videos/**/preview.html
+
+# 临时分析脚本与产物
+tests/analyze_*.py
+tests/audit_*.py
+tests/compare_*.py
+tests/reassemble*.py
+tests/verify_*.py
+tests/validate_existing.py
+tests/*_report.json
+tests/*_compliance_report.json
+
+# IDE / OS
+.vscode/
+.idea/
+.trae/
+.DS_Store
+Thumbs.db
