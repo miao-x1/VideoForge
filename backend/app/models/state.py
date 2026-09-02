@@ -56,6 +56,8 @@ class VideoGenerationState(BaseModel):
     user_input: str
     duration: int = 30
     style: str = ""
+    aspect_ratio: str = "9:16"
+    compliance_enabled: bool = Field(True, description="任务级合规预审开关(False 跳过 Compliance Agent)")
 
     # 各阶段产物
     requirement: Optional[StructuredRequirement] = None
@@ -63,6 +65,8 @@ class VideoGenerationState(BaseModel):
     storyboard: Optional[Storyboard] = None
     assets: List[str] = Field(default_factory=list, description="生成的素材文件路径列表")
     video_path: Optional[str] = None
+    # 视频质量校验报告(Assembly 后由 validate_video 生成)
+    quality_report: Optional[dict] = Field(None, description="VideoQualityReport 质量校验报告(grade/duration/resolution/has_audio/checks/...)")
     # ContentGuard 预检查报告(在 media 生成前评估三维度风险)
     content_guard_report: Optional[dict] = Field(None, description="ContentGuard 风险评估报告(safe/overall_risk/warnings/suggestions)")
     # Compliance Agent(脚本级合规预审):结构化报告 + 修订次数 + 人工审核标记
@@ -74,6 +78,7 @@ class VideoGenerationState(BaseModel):
     # 运行时
     status: TaskStatus = TaskStatus.PENDING
     error: Optional[str] = None
+    failure_detail: Optional[dict] = Field(None, description="结构化失败信息(stage/reason/input_files),供前端展示失败降级")
     logs: List[LogEntry] = Field(default_factory=list)
 
     created_at: float = Field(default_factory=time.time)

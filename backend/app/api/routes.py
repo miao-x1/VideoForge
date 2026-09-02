@@ -30,6 +30,8 @@ class CreateTaskRequest(BaseModel):
     user_input: str = Field(..., description="用户的视频创意")
     duration: int = Field(30, description="视频时长(秒)")
     style: str = Field("", description="视频风格")
+    aspect_ratio: str = Field("9:16", description="视频比例")
+    compliance_enabled: bool = Field(True, description="是否启用合规预审")
 
 
 class TaskBrief(BaseModel):
@@ -42,7 +44,8 @@ class TaskBrief(BaseModel):
 @router.post("/tasks", response_model=TaskBrief)
 async def create_task(req: CreateTaskRequest) -> TaskBrief:
     state = task_store.create(
-        user_input=req.user_input, duration=req.duration, style=req.style
+        user_input=req.user_input, duration=req.duration, style=req.style,
+        aspect_ratio=req.aspect_ratio, compliance_enabled=req.compliance_enabled,
     )
     # 后台异步执行 Pipeline,不阻塞响应
     asyncio.create_task(orchestrator.execute(state))
@@ -98,6 +101,16 @@ async def get_result(task_id: str) -> dict:
         "video_url": f"/storage/videos/{task_id}.mp4" if s.video_path else None,
         "title": s.script.title if s.script else None,
         "created_at": s.created_at,
+        # 各阶段结构化产物(供前端生成结束后展示报告面板)
+        "requirement": s.requirement.model_dump() if s.requirement else None,
+        "script": s.script.model_dump() if s.script else None,
+        "storyboard": s.storyboard.model_dump() if s.storyboard else None,
+        "compliance_report": s.compliance_report,
+        "content_guard_report": s.content_guard_report,
+        "quality_report": s.quality_report,
+        "revision_count": s.revision_count,
+        "human_review_required": s.human_review_required,
+        "failure_detail": s.failure_detail,
     }
 
 
@@ -115,8 +128,19 @@ async def stream_task(task_id: str) -> StreamingResponse:
                     "logs": [l.model_dump() for l in state.logs],
                     "error": state.error,
                     "video_path": state.video_path,
+                    "failure_detail": state.failure_detail,
+                    # 渐进推送各阶段产物(生成中逐步填充,前端实时展示)
+                    "requirement": state.requirement.model_dump() if state.requirement else None,
+                    "script": state.script.model_dump() if state.script else None,
+                    "storyboard": state.storyboard.model_dump() if state.storyboard else None,
+                    "compliance_report": state.compliance_report,
+                    "content_guard_report": state.content_guard_report,
+                    "quality_report": state.quality_report,
+                    "revision_count": state.revision_count,
+                    "human_review_required": state.human_review_required,
                 },
                 ensure_ascii=False,
+                default=str,
             )
             yield f"data: {payload}\n\n"
 

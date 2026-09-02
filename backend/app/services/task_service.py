@@ -17,8 +17,12 @@ class TaskStore:
         self._queues: Dict[str, List[asyncio.Queue]] = {}
 
     # ---- 任务 CRUD ----
-    def create(self, *, user_input: str, duration: int, style: str) -> VideoGenerationState:
-        state = VideoGenerationState(user_input=user_input, duration=duration, style=style)
+    def create(self, *, user_input: str, duration: int, style: str,
+               aspect_ratio: str = "9:16", compliance_enabled: bool = True) -> VideoGenerationState:
+        state = VideoGenerationState(
+            user_input=user_input, duration=duration, style=style,
+            aspect_ratio=aspect_ratio, compliance_enabled=compliance_enabled,
+        )
         self._tasks[state.task_id] = state
         return state
 
@@ -65,8 +69,8 @@ class TaskStore:
             while True:
                 state = await q.get()
                 yield state
-                # 终止条件:任务进入终态
-                if state.status in ("COMPLETED", "FAILED"):
+                # 终止条件:任务进入终态(COMPLETED/FAILED/HUMAN_REVIEW)
+                if state.status in ("COMPLETED", "FAILED", "HUMAN_REVIEW"):
                     break
         finally:
             self.unsubscribe(task_id, q)

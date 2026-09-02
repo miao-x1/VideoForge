@@ -25,7 +25,7 @@ class Settings(BaseSettings):
 
     # Provider 选择
     llm_provider: Literal["mock", "dashscope"] = "mock"
-    image_provider: Literal["mock", "seedream", "dashscope"] = "mock"
+    image_provider: Literal["mock", "dashscope"] = "mock"
     image_model: str = "wanx2.1-t2i-turbo"  # 通义万相文生图模型(wanx2.1-t2i-turbo / wanx2.1-t2i-plus / wanx-v1)
     voice_provider: Literal["mock", "dashscope"] = "mock"
     music_provider: Literal["mock", "ambient"] = "mock"

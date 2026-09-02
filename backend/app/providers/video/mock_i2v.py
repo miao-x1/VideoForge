@@ -10,7 +10,6 @@ from __future__ import annotations
 
 import os
 
-from moviepy import ImageClip, vfx
 from PIL import Image
 
 from ...core.logging import logger
@@ -29,6 +28,8 @@ class MockI2VProvider(VideoProvider):
         # 输入图片尺寸
         with Image.open(image_path) as im:
             w, h = im.size
+        # 延迟导入 moviepy:模块级 import 会导致未安装 moviepy 时后端无法启动
+        from moviepy import ImageClip, vfx
         # 轻微 Ken Burns: 1.0 → 1.05 放大,模拟"动态"视频
         clip = ImageClip(image_path, duration=duration)
         clip = clip.with_effects([vfx.Resize(new_size=lambda t: 1.0 + 0.05 * (t / duration))])

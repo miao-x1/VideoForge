@@ -1,10 +1,8 @@
 """Mock LLM Provider。
 
-第一阶段用预置的"假如古代人有手机"主题数据，保证 Pipeline 立刻可跑通。
-未来接真实 LLM 时，仅替换此实现，Agent 层零改动。
-
-设计要点：即使输入其他创意，也能基于通用模板产出一个可消费的 Storyboard，
-让骨架测试不依赖特定输入。
+根据 user_input 动态生成通用 Pipeline 数据,不硬编码特定主题。
+保证任意输入都能产出结构化 requirement/script/storyboard,让骨架测试不依赖特定题材。
+未来接真实 LLM 时,仅替换此实现,Agent 层零改动。
 """
 from __future__ import annotations
 
@@ -15,33 +13,33 @@ from .base import LLMProvider
 
 def _requirement_data(ctx: Dict[str, Any]) -> Dict[str, Any]:
     duration = int(ctx.get("duration") or 30)
-    style = ctx.get("style") or "古装喜剧"
-    user_input = ctx.get("user_input") or "假如古代人有手机"
+    style = ctx.get("style") or "轻松搞笑"
+    user_input = ctx.get("user_input") or "短视频创意"
     return {
         "topic": user_input,
-        "genre": "轻喜剧",
+        "genre": "短视频",
         "duration": duration,
         "style": style,
         "audience": "大众",
         "characters": [
-            {"name": "书生", "description": "穿青衫、手持手机的古代读书人"},
-            {"name": "皇帝", "description": "龙袍,沉迷短视频"},
-            {"name": "太监", "description": "捧着奏折,神情焦急"},
+            {"name": "主角", "description": f"与「{user_input}」相关的核心角色"},
+            {"name": "配角", "description": "辅助叙事的人物"},
         ],
         "scenes": [
-            {"location": "书房", "description": "书生挑灯夜读,手机屏幕亮着"},
-            {"location": "金銮殿", "description": "皇帝批奏折,龙案上摆着手机"},
+            {"location": "场景一", "description": f"围绕「{user_input}」的开场画面"},
+            {"location": "场景二", "description": f"围绕「{user_input}」的高潮画面"},
         ],
-        "tone": "轻松搞笑",
-        "visual_style": "古典工笔+现代手机元素混搭",
-        "output_requirement": "1280x720, 16:9",
+        "tone": style,
+        "visual_style": f"{style}风格,贴合「{user_input}」主题",
+        "output_requirement": "720x1280, 9:16",
     }
 
 
 def _script_data(ctx: Dict[str, Any]) -> Dict[str, Any]:
     req = ctx.get("requirement") or {}
     duration = int(req.get("duration") or 30)
-    topic = req.get("topic") or "假如古代人有手机"
+    topic = req.get("topic") or "短视频创意"
+    style = req.get("style") or "轻松搞笑"
     # 按 5 秒一个分场切分
     per = 5
     n = max(1, duration // per)
@@ -50,17 +48,17 @@ def _script_data(ctx: Dict[str, Any]) -> Dict[str, Any]:
         scenes.append({
             "scene_id": i + 1,
             "duration": per,
-            "location": ["书房", "金銮殿", "街道"][i % 3],
-            "characters": ["书生", "皇帝", "太监"][i % 3: i % 3 + 1],
-            "visual": f"第{i+1}幕:古代人玩手机,引发笑料",
+            "location": f"场景{i + 1}",
+            "characters": ["主角"],
+            "visual": f"第{i+1}幕:围绕「{topic}」展开,{style}风格",
             "dialogue": "",
-            "voiceover": f"假如古代人有手机,第{i+1}幕:古人也躲不开消息轰炸。",
+            "voiceover": f"{topic}。第{i+1}幕:故事在这里展开,引人入胜。",
         })
     return {
         "title": topic,
-        "hook": "皇帝批奏折刷短视频停不下来,太监急得直跺脚",
+        "hook": f"「{topic}」——一个让人忍不住看下去的故事",
         "scenes": scenes,
-        "ending": "原来古人有了手机,一样被消息淹没。",
+        "ending": f"故事在「{topic}」中落下帷幕,回味无穷。",
     }
 
 
@@ -75,23 +73,23 @@ def _storyboard_data(ctx: Dict[str, Any]) -> Dict[str, Any]:
         duration = int(sc.get("duration", 5))
         visual = sc.get("visual", "")
         voiceover = sc.get("voiceover", "")
+        location = sc.get("location", "")
         shots.append({
             "scene_id": sid,
             "duration": duration,
             "shot_type": shot_types[i % len(shot_types)],
             "camera_movement": cams[i % len(cams)],
             "visual_description": visual,
-            "character_action": "人物低头看手机,表情丰富",
+            "character_action": "主角在画面中活动,表情生动",
             "dialogue": sc.get("dialogue", ""),
             "voiceover": voiceover,
-            "background_music": "轻快古风BGM",
-            "sound_effect": "消息提示音",
+            "background_music": "轻快BGM",
+            "sound_effect": "环境音效",
             "image_prompt": (
-                f"ancient Chinese {sc.get('location','')} scene, "
-                f"a character in traditional robe holding a glowing smartphone, "
-                f"cinematic lighting, humorous, detailed illustration"
+                f"{location} scene, {visual}, "
+                f"cinematic lighting, detailed illustration, high quality"
             ),
-            "video_prompt": f"{visual}, slow motion, humorous ancient-modern mashup",
+            "video_prompt": f"{visual}, smooth motion, cinematic",
         })
     return {"shots": shots}
 

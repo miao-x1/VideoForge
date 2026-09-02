@@ -7,3 +7,5 @@ moviepy==2.2.1
 Pillow==10.2.0
 numpy
 openai
+httpx
+pytest

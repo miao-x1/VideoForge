@@ -62,7 +62,7 @@ class DashScopeLLMProvider(LLMProvider):
         self.model = model or settings.llm_model
         if not self.api_key:
             raise RuntimeError("DashScope LLM 缺少 API Key(请配置 .env: LLM_API_KEY 或 DASHSCOPE_API_KEY)")
-        self.client = OpenAI(api_key=self.api_key, base_url=self.base_url)
+        self.client = OpenAI(api_key=self.api_key, base_url=self.base_url, timeout=120)
 
     async def generate(self, *, task: str, context: Dict[str, Any]) -> Dict[str, Any]:
         if task not in PROMPTS:
@@ -91,6 +91,23 @@ class DashScopeLLMProvider(LLMProvider):
             )
             return resp.choices[0].message.content or ""
 
-        content = await asyncio.to_thread(_call)
-        logger.debug("LLM 原始返回(task=%s): %s", task, content[:200])
-        return _extract_json(content)
+        # Retry:DashScope 偶发超时/限流时重试,指数退避,耗尽抛错让 Orchestrator 标记 FAILED
+        max_retries = 2
+        last_err: Exception | None = None
+        for attempt in range(max_retries + 1):
+            try:
+                content = await asyncio.to_thread(_call)
+                logger.debug("LLM 原始返回(task=%s): %s", task, content[:200])
+                return _extract_json(content)
+            except Exception as e:
+                last_err = e
+                if attempt < max_retries:
+                    wait = 1.5 ** attempt
+                    logger.warning(
+                        "LLM 调用失败 task=%s attempt=%d/%d,%.1fs 后重试: %s",
+                        task, attempt + 1, max_retries + 1, wait, e,
+                    )
+                    await asyncio.sleep(wait)
+        raise RuntimeError(
+            f"LLM 调用 {max_retries + 1} 次仍失败 task={task}: {last_err}"
+        )

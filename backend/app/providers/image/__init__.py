@@ -22,13 +22,6 @@ def get_image_provider() -> ImageProvider:
         except Exception as e:  # 导入或初始化失败时回退 mock,保证 Pipeline 不崩
             logger.warning("DashScope Image Provider 初始化失败,回退 Mock: %s", e)
             return MockImageProvider()
-    if settings.image_provider == "seedream":
-        try:
-            from .seedream_image import SeedreamImageProvider
-            return SeedreamImageProvider()
-        except Exception as e:
-            logger.warning("Seedream Provider 初始化失败,回退 Mock: %s", e)
-            return MockImageProvider()
     return MockImageProvider()
 
 

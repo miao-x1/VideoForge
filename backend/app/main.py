@@ -4,6 +4,8 @@
 """
 from __future__ import annotations
 
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
@@ -13,7 +15,16 @@ from .core.config import STORAGE_ROOT, settings
 from .core.logging import logger
 
 
-app = FastAPI(title="AI Video Agent", version="0.1.0")
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # startup
+    logger.info("AI Video Agent 启动 (llm=%s)", settings.llm_provider)
+    yield
+    # shutdown
+    logger.info("AI Video Agent 关闭")
+
+
+app = FastAPI(title="AI Video Agent", version="0.1.0", lifespan=lifespan)
 
 # CORS:允许前端 dev server 跨域访问
 app.add_middleware(
@@ -44,8 +55,3 @@ async def root() -> dict:
             "music": settings.music_provider,
         },
     }
-
-
-@app.on_event("startup")
-async def _startup() -> None:
-    logger.info("AI Video Agent 启动 (llm=%s)", settings.llm_provider)

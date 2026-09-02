@@ -33,6 +33,7 @@ from ..services.task_service import task_store
 from ..guard import ContentGuard
 from ..compliance import TextComplianceAgent, ScriptRevisionAgent, ComplianceAuditLogger
 from ..video.assembly import VideoAssembler, get_video_assembler
+from ..video.quality import validate_video
 
 
 class Orchestrator:
@@ -76,8 +77,19 @@ class Orchestrator:
                 await self._run_media(state)
                 await self._run_assembly(state)
         except Exception as e:
-            logger.exception("Pipeline 失败 task=%s", state.task_id)
-            state.mark_failed(f"{type(e).__name__}: {e}")
+            logger.exception("Pipeline 失败 task=%s 阶段=%s", state.task_id, state.status.value)
+            # 结构化失败记录:当前阶段 + 原因 + 已生成输入文件,供前端展示失败降级
+            failed_stage = state.status.value
+            input_files = list(state.assets) if state.assets else []
+            state.failure_detail = {
+                "stage": failed_stage,
+                "reason": f"{type(e).__name__}: {e}",
+                "input_files": input_files,
+            }
+            err_msg = f"[阶段:{failed_stage}] {type(e).__name__}: {e}"
+            if input_files:
+                err_msg += f" | 已生成素材 {len(input_files)} 个"
+            state.mark_failed(err_msg)
             task_store.save(state)
         return state
 
@@ -105,7 +117,7 @@ class Orchestrator:
         失败保护:Compliance Agent 自身异常 -> review + human_review_required(不自动放行)
         开关:settings.compliance_check_enabled=false 则跳过,回退原 Pipeline。
         """
-        if not settings.compliance_check_enabled:
+        if not state.compliance_enabled:
             state.append_log(TaskStatus.STORYBOARDING, "合规预审已关闭,跳过")
             task_store.save(state)
             return
@@ -232,7 +244,13 @@ class Orchestrator:
         total_duration = 0
         assets: List[str] = []
 
+        n_shots = len(state.storyboard.shots)
         for i, shot in enumerate(state.storyboard.shots):
+            state.append_log(
+                TaskStatus.GENERATING_ASSETS,
+                f"正在生成第 {i+1}/{n_shots} 个镜头素材(文生图 + TTS + I2V)",
+            )
+            task_store.save(state)
             # 1) 文生图(关键帧,也作为 I2V 首帧)
             img_path = os.path.join(img_dir, f"{state.task_id}_shot{i}.png")
             await self.image.generate(
@@ -262,8 +280,16 @@ class Orchestrator:
                 )
                 shot.video_path = clip_path
                 assets.append(clip_path)
-                shot.duration = 5  # I2V 固定时长
-                logger.info("shot%d: I2V 5s 动态片段生成成功 → duration=5s", i)
+                # I2V 固定 5s;最后一个镜头补齐到目标时长(assembly 自动 freeze frame 延展)
+                if i == n_shots - 1:
+                    shot.duration = max(state.duration - total_duration, 2)
+                    logger.info(
+                        "shot%d: I2V 动态片段生成成功 → duration=%ds(末尾补齐 target=%ds)",
+                        i, shot.duration, state.duration,
+                    )
+                else:
+                    shot.duration = 5  # I2V 固定时长
+                    logger.info("shot%d: I2V 5s 动态片段生成成功", i)
             except Exception as e:
                 logger.warning("shot%d: I2V 失败,fallback 到 Ken Burns + TTS 时长同步: %s", i, e)
                 # fallback:用 TTS 实际时长 + 0.5s 缓冲(原第五阶段逻辑)
@@ -309,14 +335,42 @@ class Orchestrator:
         # BGM 路径:约定在 assets 末尾
         bgm_path = state.assets[-1] if state.assets else ""
 
-        await self.assembler.assemble(
-            shots=state.storyboard.shots,
-            bgm_path=bgm_path,
-            output_path=output_path,
-            title=title,
-        )
+        n_shots = len(state.storyboard.shots)
+        n_i2v = sum(1 for s in state.storyboard.shots if s.video_path)
+        try:
+            await self.assembler.assemble(
+                shots=state.storyboard.shots,
+                bgm_path=bgm_path,
+                output_path=output_path,
+                title=title,
+            )
+        except Exception as e:
+            # Assembly 专属失败上下文:镜头数 / I2V 片段数 / 输出路径,供 failure_detail.reason 定位
+            raise RuntimeError(
+                f"Assembly 失败(shots={n_shots}, i2v={n_i2v}, output={output_path}): {e}"
+            ) from e
         state.video_path = output_path
         logger.info("视频合成完成: %s", output_path)
+
+        # 质量校验:对最终 MP4 + 素材清单做规格/一致性检查,输出 A/B/C/D 评级
+        try:
+            report = await validate_video(
+                video_path=output_path,
+                storyboard=state.storyboard,
+                expected_duration=state.duration,
+            )
+            state.quality_report = report
+            logger.info(
+                "质量校验完成: grade=%s dur=%.2fs %dx%d audio=%s",
+                report.get("grade"), report.get("duration", 0),
+                report.get("width", 0), report.get("height", 0),
+                report.get("has_audio"),
+            )
+            state.append_log(TaskStatus.COMPLETED, f"质量校验完成: grade={report.get('grade')}")
+        except Exception as e:
+            logger.warning("质量校验失败(不影响产物): %s", e)
+            state.append_log(TaskStatus.COMPLETED, f"质量校验失败: {e}")
+
         state.append_log(TaskStatus.COMPLETED, "视频生成完成")
         task_store.save(state)
 
