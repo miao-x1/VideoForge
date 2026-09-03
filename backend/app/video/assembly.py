@@ -89,16 +89,18 @@ def _apply_ken_burns(clip, motion: str, duration: int, W: int, H: int):
     return clip.with_effects([vfx.Resize(new_size=1.05)]).with_position(("center", "center"))
 
 
-def _make_subtitle_array(text: str, W: int, H: int) -> np.ndarray:
-    """渲染单句字幕为 RGBA numpy 数列(透明背景 + 半透明黑条 + 白字)。"""
+def _make_subtitle_array(text: str, W: int, H: int, font_size: int = 0) -> np.ndarray:
+    """渲染单句字幕为 RGBA numpy 数列(透明背景 + 半透明黑条 + 白字)。
+
+    font_size: >0 时覆盖全局默认(逐镜头字幕字号)。
+    """
     img = Image.new("RGBA", (W, H), (0, 0, 0, 0))
     draw = ImageDraw.Draw(img)
+    fs = font_size or settings.subtitle_font_size
     try:
-        font = ImageFont.truetype(settings.subtitle_font_path, settings.subtitle_font_size)
+        font = ImageFont.truetype(settings.subtitle_font_path, fs)
     except OSError:
         font = ImageFont.load_default()
-
-    fs = settings.subtitle_font_size
     max_chars = max(8, (W - 60) // fs)
     lines = textwrap.wrap(text, width=max_chars) or [text]
     if len(lines) > 2:
@@ -130,7 +132,6 @@ def _build_video_sync(
         CompositeVideoClip,
         ImageClip,
         VideoFileClip,
-        concatenate_audioclips,
         concatenate_videoclips,
         vfx,
     )
@@ -162,16 +163,16 @@ def _build_video_sync(
             base = ImageClip(np.array(pil_img), duration=d)
             base = _apply_ken_burns(base, shot.camera_movement, d, W, H)
 
-        # 3) 逐句字幕 overlay(优先 subtitle 字段,回退 voiceover)
+        # 3) 逐句字幕 overlay(优先 subtitle 字段,回退 voiceover;逐镜头开关+字号)
         clips_for_shot = [base]
         subtitle_text = shot.subtitle or shot.voiceover or shot.visual_description or ""
-        if subtitle_text:
+        if subtitle_text and shot.subtitle_enabled:
             sentences = _split_sentences(subtitle_text)
             n = len(sentences)
             if n > 0:
                 seg_dur = d / n
                 for j, sent in enumerate(sentences):
-                    sub_arr = _make_subtitle_array(sent, W, H)
+                    sub_arr = _make_subtitle_array(sent, W, H, font_size=shot.subtitle_font_size or 0)
                     sc = ImageClip(sub_arr, duration=seg_dur).with_start(j * seg_dur)
                     clips_for_shot.append(sc)
 
@@ -192,9 +193,15 @@ def _build_video_sync(
 
     video = concatenate_videoclips(all_clips, method="compose")
 
-    # 6) 音轨:旁白 + BGM
-    narration_clips = [AudioFileClip(s.audio_path) for s in shots if s.audio_path]
-    narration = concatenate_audioclips(narration_clips) if narration_clips else None
+    # 6) 音轨(时间轴语义):旁白按各自镜头的起始时刻对齐放置,不再顺序拼接
+    #    (消除"旁白时长≠镜头时长"时的累积漂移;超长旁白自然跨入下一镜头)
+    audio_clips: list = []
+    t_cursor = 0.0
+    for shot in shots:
+        if shot.audio_path and os.path.exists(shot.audio_path):
+            narr = AudioFileClip(shot.audio_path).with_start(t_cursor)
+            audio_clips.append(narr)
+        t_cursor += max(shot.duration, 1)
 
     bgm = None
     if bgm_path and os.path.exists(bgm_path):
@@ -204,14 +211,9 @@ def _build_video_sync(
         else:
             bgm = bgm.subclipped(0, video.duration)
 
-    if narration and bgm:
-        final_audio = CompositeAudioClip([narration, bgm])
-    elif narration:
-        final_audio = narration
-    elif bgm:
-        final_audio = bgm
-    else:
-        final_audio = None
+    if bgm is not None:
+        audio_clips.append(bgm)
+    final_audio = CompositeAudioClip(audio_clips) if audio_clips else None
 
     if final_audio is not None:
         video = video.with_audio(final_audio)

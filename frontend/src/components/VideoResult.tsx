@@ -1,9 +1,11 @@
+import { useState } from 'react';
 import {
   Card,
   Collapse,
   Descriptions,
   Empty,
   List,
+  Select,
   Tag,
   Typography,
   Image as AntImage,
@@ -35,6 +37,7 @@ interface Props {
 }
 
 export default function VideoResult({ result }: Props) {
+  const [selectedUrl, setSelectedUrl] = useState<string | null>(null);
   if (!result) {
     return <Empty description="视频尚未生成" />;
   }
@@ -45,26 +48,53 @@ export default function VideoResult({ result }: Props) {
   const compliance = result.compliance_report;
   const guard = result.content_guard_report;
   const quality = result.quality_report;
+  const versions = result.video_versions ?? [];
+  const currentUrl = selectedUrl || result.video_url;
 
   return (
     <Card>
-      {result.video_url ? (
+      {currentUrl ? (
         <video
-          src={result.video_url}
+          src={currentUrl}
           controls
+          key={currentUrl}
           style={{ width: '100%', borderRadius: 8, background: '#000' }}
         />
       ) : (
         <Empty description="视频生成中或未生成" />
       )}
 
+      {versions.length > 1 && (
+        <div style={{ marginTop: 8, display: 'flex', alignItems: 'center', gap: 8 }}>
+          <Text type="secondary" style={{ fontSize: 12 }}>历史版本</Text>
+          <Select
+            size="small"
+            value={currentUrl ?? undefined}
+            onChange={setSelectedUrl}
+            style={{ minWidth: 220 }}
+            options={versions.map((v) => ({
+              value: v.url,
+              label: `v${v.version}${v.current ? '(当前)' : ''} · ${v.reason || '成片'} · ${new Date(v.ts * 1000).toLocaleString('zh-CN', { hour12: false })}`,
+            }))}
+          />
+          {selectedUrl && selectedUrl !== result.video_url && (
+            <Tag color="orange">正在查看历史版本</Tag>
+          )}
+        </div>
+      )}
+
       <div style={{ marginTop: 16 }}>
         <Title level={4} style={{ marginBottom: 4 }}>
           {result.title || 'AI 生成的视频'}
         </Title>
-        <Text type="secondary" style={{ fontSize: 13 }}>
-          生成时间：{time}
-        </Text>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+          <Text type="secondary" style={{ fontSize: 13 }}>
+            生成时间：{time}
+          </Text>
+          {result.model_used && (
+            <Tag color="blue">{result.model_used}</Tag>
+          )}
+        </div>
       </div>
 
       <Collapse style={{ marginTop: 16 }} accordion>

@@ -14,7 +14,8 @@ from ..providers.llm.base import LLMProvider
 class BaseAgent(ABC):
     name: str = "base"
 
-    def __init__(self, llm: LLMProvider) -> None:
+    def __init__(self, llm: LLMProvider | None = None) -> None:
+        # llm 对 LLM 驱动的 Agent 必填;图片/视频生成 Agent 不依赖 LLM,可传 None
         self.llm = llm
 
     @abstractmethod

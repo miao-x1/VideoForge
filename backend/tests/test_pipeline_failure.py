@@ -7,17 +7,25 @@
 import asyncio
 from pathlib import Path
 
+import pytest
+
 from app.models.state import TaskStatus, VideoGenerationState
 from app.orchestrator.orchestrator import Orchestrator
 from app.providers.image.base import ImageProvider
 from app.providers.llm.mock_llm import MockLLMProvider
 from app.providers.music.base import MusicProvider
-from app.providers.video.base import VideoProvider
+from app.providers.video.base import VideoModelProvider, ModelRequest, ModelResponse
 from app.providers.voice.base import VoiceProvider
 from app.video.assembly import VideoAssembler
 
 
-# ---- 轻量 Fake Provider:创建空占位文件,不触发真实媒体处理 ----
+@pytest.fixture(autouse=True)
+def _force_mock_llm(monkeypatch):
+    """强制 mock 模式:避免 _get_reasoning_llm 注入真实 DashScope LLM(依赖账户余额)。"""
+    from app.core.config import settings
+    monkeypatch.setattr(settings, "llm_provider", "mock")
+    monkeypatch.setattr(settings, "enable_mock_providers", True)
+
 
 class _FakeImageProvider(ImageProvider):
     async def generate(self, *, prompt, save_path, width=1280, height=720):
@@ -40,14 +48,21 @@ class _FakeMusicProvider(MusicProvider):
         return save_path
 
 
-class _FakeI2VProvider(VideoProvider):
-    async def generate(self, *, image_path, prompt, save_path, duration=5):
-        Path(save_path).parent.mkdir(parents=True, exist_ok=True)
-        Path(save_path).write_bytes(b"fake")
-        return save_path
+class _FakeVideoProvider(VideoModelProvider):
+    @property
+    def name(self) -> str:
+        return "fake"
 
+    @property
+    def capabilities(self):
+        from app.providers.video.capabilities import ModelCapabilities
+        return ModelCapabilities()
 
-# ---- 失败注入 Provider ----
+    async def generate(self, request: ModelRequest) -> ModelResponse:
+        Path(request.save_path).parent.mkdir(parents=True, exist_ok=True)
+        Path(request.save_path).write_bytes(b"fake")
+        return ModelResponse(video_path=request.save_path, duration=request.duration, model=self.name)
+
 
 class _FailingAssembler(VideoAssembler):
     async def assemble(self, **kwargs):
@@ -59,19 +74,16 @@ class _FailingImageProvider(ImageProvider):
         raise RuntimeError("图片生成失败")
 
 
-# ---- 测试用例 ----
-
 def test_assembly_failure_populates_failure_detail(fake_storage):
-    """Assembly 失败 → failure_detail 记录 stage=ASSEMBLING + reason + input_files。"""
     state = VideoGenerationState(
-        user_input="测试创意", duration=10, compliance_enabled=False,
+        user_id="test-user", user_input="测试创意", duration=10, compliance_enabled=False,
     )
     orch = Orchestrator(
         llm=MockLLMProvider(),
         image=_FakeImageProvider(),
         voice=_FakeVoiceProvider(),
         music=_FakeMusicProvider(),
-        video=_FakeI2VProvider(),
+        video=_FakeVideoProvider(),
         assembler=_FailingAssembler(),
     )
     asyncio.run(orch.execute(state))
@@ -79,24 +91,21 @@ def test_assembly_failure_populates_failure_detail(fake_storage):
     assert state.status == TaskStatus.FAILED
     assert state.failure_detail is not None
     assert state.failure_detail["stage"] == "ASSEMBLING"
-    # reason 包含 Assembly 专属上下文(镜头数 / I2V 片段数 / 输出路径)
     assert "Assembly 失败" in state.failure_detail["reason"]
     assert "shots=" in state.failure_detail["reason"]
-    # Assembly 失败前素材已全部生成,input_files 非空
     assert len(state.failure_detail["input_files"]) > 0
 
 
 def test_media_failure_populates_failure_detail(fake_storage):
-    """素材生成失败 → failure_detail 记录 stage=GENERATING_ASSETS。"""
     state = VideoGenerationState(
-        user_input="测试创意", duration=10, compliance_enabled=False,
+        user_id="test-user", user_input="测试创意", duration=10, compliance_enabled=False,
     )
     orch = Orchestrator(
         llm=MockLLMProvider(),
         image=_FailingImageProvider(),
         voice=_FakeVoiceProvider(),
         music=_FakeMusicProvider(),
-        video=_FakeI2VProvider(),
+        video=_FakeVideoProvider(),
     )
     asyncio.run(orch.execute(state))
 

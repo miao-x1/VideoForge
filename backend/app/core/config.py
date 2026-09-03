@@ -23,20 +23,34 @@ class Settings(BaseSettings):
     app_port: int = 8000
     debug: bool = True
 
-    # Provider 选择
-    llm_provider: Literal["mock", "dashscope"] = "mock"
-    image_provider: Literal["mock", "dashscope"] = "mock"
-    image_model: str = "wanx2.1-t2i-turbo"  # 通义万相文生图模型(wanx2.1-t2i-turbo / wanx2.1-t2i-plus / wanx-v1)
-    voice_provider: Literal["mock", "dashscope"] = "mock"
-    music_provider: Literal["mock", "ambient"] = "mock"
+    # 环境控制:production 禁止 Mock，test 允许 Mock
+    app_env: Literal["production", "test"] = "production"
+    enable_mock_providers: bool = False  # 仅 APP_ENV=test 时可设 True
+
+    # Provider 选择 (生产默认全部使用真实 Provider)
+    llm_provider: Literal["mock", "dashscope"] = "dashscope"
+    image_provider: Literal["mock", "dashscope"] = "dashscope"
+    image_model: str = "wanx2.1-t2i-turbo"
+    voice_provider: Literal["mock", "dashscope"] = "dashscope"
+    music_provider: Literal["mock", "ambient"] = "ambient"
     tts_model: str = "qwen-audio-3.0-tts-flash"
-    tts_voice: str = "longanhuan_v3.6"  # 中文女声(适合中文旁白)
-    # TTS 目标语言(BCP-47 tag):zh-CN(中文普通话,默认) / en-US / ja-JP 等
-    # LLM 在 storyboard 阶段会按此语言生成 voiceover 文本,Voice Provider voice 已含语言
+    tts_voice: str = "longanhuan_v3.6"
     tts_language: str = "zh-CN"
-    # 图生视频(I2V)Provider: mock(伪 Ken Burns,本地测试) | dashscope(通义万相 wan2.6-i2v-flash,真实连续动作)
-    i2v_provider: Literal["mock", "dashscope"] = "mock"
-    i2v_model: str = "wan2.6-i2v-flash"  # 通义万相图生视频模型(wan2.6-i2v-flash 默认,支持 2-15s + 720P/1080P)
+    # 图生视频 Provider: qwen | minimax | comfy (mock 仅测试环境可用)
+    video_model_provider: Literal["mock", "qwen", "minimax", "comfy"] = "qwen"
+    i2v_provider: Literal["mock", "dashscope"] = "dashscope"
+    # Qwen(DashScope)视频模型
+    qwen_api_key: str = ""
+    qwen_video_model: str = "wan2.6-i2v-flash"
+    # MiniMax 视频模型(H3 直连,V2 API,pay-as-you-go)
+    minimax_api_key: str = ""
+    minimax_video_model: str = "MiniMax-H3"  # MiniMax-H3 / MiniMax-H3-Max
+    minimax_base_url: str = "https://api.minimax.io"  # 国际站;国内站用 https://api.minimax.cn
+    # 云端 ComfyUI(Workflow 执行层,如 MiniMax H3 官方模板)
+    comfy_api_key: str = ""  # 环境变量 COMFY_API_KEY,禁止写入前端/数据库/Git
+    comfy_base_url: str = "https://cloud.comfy.org"
+    # 模型路由策略:auto(综合) | best_quality | lowest_cost | fastest | manual
+    routing_strategy: Literal["auto", "best_quality", "lowest_cost", "fastest", "manual"] = "auto"
 
     # 通用 LLM 连接(OpenAI 兼容,DashScope/DeepSeek 等均可用)
     llm_api_key: str = ""
@@ -66,6 +80,24 @@ class Settings(BaseSettings):
     compliance_audit_enabled: bool = True
     # review(边界)时是否阻断 Pipeline:True=进入人工审核不生成;False=打标后继续生成草稿
     compliance_halt_on_review: bool = False
+
+    # JWT 鉴权
+    jwt_secret: str = "videoforge-dev-secret-change-in-production"
+    jwt_algorithm: str = "HS256"
+    jwt_expire_hours: int = 72
+
+    # CORS 允许来源(逗号分隔,空则允许全部)
+    cors_origins: str = ""
+
+    # 多模态:图片理解模型(Qwen-VL 系列)
+    vl_model: str = "qwen-vl-max"
+    # 文件上传限制(MB)
+    upload_max_size_mb: int = 20
+
+    # RAG:视频历史库 + 向量检索
+    embedding_model: str = "text-embedding-v3"
+    embedding_dim: int = 1024
+    milvus_uri: str = ""  # 空则使用 Milvus Lite 本地文件
 
 
 settings = Settings()

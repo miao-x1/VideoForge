@@ -1,4 +1,6 @@
 """测试公共 fixtures。"""
+import asyncio
+
 import pytest
 from fastapi.testclient import TestClient
 
@@ -8,25 +10,43 @@ from app.services.task_service import task_store
 
 @pytest.fixture(autouse=True)
 def _clear_task_store():
-    """每个测试前后清空 task_store 单例,避免测试间状态泄漏。"""
-    task_store._tasks.clear()
+    task_store._cache.clear()
     task_store._queues.clear()
     yield
-    task_store._tasks.clear()
+    task_store._cache.clear()
     task_store._queues.clear()
 
 
 @pytest.fixture
 def client() -> TestClient:
-    return TestClient(app)
+    with TestClient(app) as c:
+        yield c
 
 
 @pytest.fixture
 def fake_storage(tmp_path, monkeypatch):
-    """将 STORAGE_ROOT 重定向到 tmp_path,隔离文件写入。
+    from app.core.config import STORAGE_ROOT as _orig
+    import app.core.config as cfg
+    monkeypatch.setattr(cfg, "STORAGE_ROOT", tmp_path)
+    from app.db.database import reset_engine, init_db
+    reset_engine()
+    asyncio.run(init_db())
+    yield tmp_path
+    reset_engine()
+    monkeypatch.setattr(cfg, "STORAGE_ROOT", _orig)
 
-    storage_dir() 内部引用 app.core.config.STORAGE_ROOT 全局,
-    monkeypatch 后所有 storage_dir() 调用都会落到 tmp_path 下。
-    """
-    monkeypatch.setattr("app.core.config.STORAGE_ROOT", tmp_path)
-    return tmp_path
+
+@pytest.fixture
+def auth_headers(client: TestClient) -> dict:
+    resp = client.post("/api/auth/register", json={
+        "email": "test@videoforge.dev",
+        "password": "testpass123",
+        "display_name": "TestUser",
+    })
+    if resp.status_code == 409:
+        resp = client.post("/api/auth/login", json={
+            "email": "test@videoforge.dev",
+            "password": "testpass123",
+        })
+    token = resp.json()["access_token"]
+    return {"Authorization": f"Bearer {token}"}

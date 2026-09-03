@@ -47,3 +47,4 @@ tests/*_compliance_report.json
 .trae/
 .DS_Store
 Thumbs.db
+backend/.libs/ 

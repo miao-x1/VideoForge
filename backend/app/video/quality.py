@@ -157,6 +157,15 @@ async def validate_video(
     if storyboard is not None:
         shots = storyboard.shots
         n_scenes = len(shots)
+
+        def _has_visual(s) -> bool:
+            """画面素材就位:有关键帧(I2V/R2V)或已有动态片段(T2V 无关键帧属正常)。"""
+            return (
+                (bool(s.video_path) and os.path.exists(s.video_path))
+                or (bool(s.image_path) and os.path.exists(s.image_path))
+            )
+
+        n_visual = sum(1 for s in shots if _has_visual(s))
         n_imgs = sum(1 for s in shots if s.image_path and os.path.exists(s.image_path))
         n_tts = sum(1 for s in shots if s.audio_path and os.path.exists(s.audio_path))
         report["scenes"] = n_scenes
@@ -166,10 +175,10 @@ async def validate_video(
         if n_scenes == 0:
             report["errors"].append("分镜列表为空")
         else:
-            if n_imgs == n_scenes:
-                checks.append(f"图片数量匹配场景 ({n_imgs}/{n_scenes})")
+            if n_visual == n_scenes:
+                checks.append(f"画面素材数量匹配场景 ({n_visual}/{n_scenes})")
             else:
-                report["errors"].append(f"图片数量不匹配: 期望 {n_scenes}, 实际 {n_imgs}")
+                report["errors"].append(f"画面素材数量不匹配: 期望 {n_scenes}, 实际 {n_visual}")
             if n_tts == n_scenes:
                 checks.append(f"TTS 数量匹配场景 ({n_tts}/{n_scenes})")
             else:
@@ -177,9 +186,9 @@ async def validate_video(
 
         # 各素材文件非空
         for i, s in enumerate(shots):
-            if not s.image_path or not os.path.exists(s.image_path):
-                report["errors"].append(f"shot{i} 图片缺失: {s.image_path}")
-            elif os.path.getsize(s.image_path) < 1024:
+            if not _has_visual(s):
+                report["errors"].append(f"shot{i} 画面素材缺失(无关键帧/视频片段): {s.video_path or s.image_path}")
+            elif s.image_path and os.path.exists(s.image_path) and os.path.getsize(s.image_path) < 1024:
                 report["warnings"].append(f"shot{i} 图片过小: {os.path.getsize(s.image_path)} bytes")
             if not s.audio_path or not os.path.exists(s.audio_path):
                 report["errors"].append(f"shot{i} TTS 缺失: {s.audio_path}")

@@ -1,16 +1,22 @@
-import { Steps } from 'antd';
+import { Steps, Tag, Typography, Collapse, Descriptions } from 'antd';
 import {
   CheckCircleFilled,
   LoadingOutlined,
   CloseCircleFilled,
   WarningFilled,
+  BulbFilled,
 } from '@ant-design/icons';
-import type { TaskStatus, LogEntry } from '../api/client';
+import type { TaskStatus, LogEntry, CreativeIntent } from '../api/client';
+
+const { Text } = Typography;
 
 interface Props {
   status: TaskStatus;
   logs: LogEntry[];
   error: string | null;
+  failureDetail?: any | null;
+  modelUsed?: string | null;
+  creativeIntent?: CreativeIntent | null;
 }
 
 // 7 阶段,对齐后端 Pipeline:
@@ -31,8 +37,11 @@ const STATUS_STAGE: Record<TaskStatus, number> = {
   ANALYZING: 0,
   SCRIPTING: 1,
   COMPLIANCE_CHECKING: 2,
+  SCRIPT_REVIEW: 1, // 脚本已生成,等待用户确认(Gate 2)
   STORYBOARDING: 3,
+  STORYBOARD_REVIEW: 3, // 分镜已生成,等待用户确认(Gate 3)
   GENERATING_ASSETS: 4, // 默认 ContentGuard,用 logs 细分到 media(5)
+  PROMPT_REVIEW: 4, // Prompt 已编译,等待用户确认(Gate 4)
   ASSEMBLING: 6,
   COMPLETED: 7,
   FAILED: 7,
@@ -80,7 +89,25 @@ function resolveShotProgress(logs: LogEntry[]): string | null {
   return null;
 }
 
-export default function ProgressTimeline({ status, logs, error }: Props) {
+// 错误码 → 中文说明
+const ERROR_CODE_LABELS: Record<string, string> = {
+  INSUFFICIENT_BALANCE: '账户余额不足',
+  MODEL_UNAVAILABLE: '模型不可用',
+  MODEL_NOT_AVAILABLE: '指定模型不可用',
+  NO_MODELS_AVAILABLE: '无可用模型',
+  PROVIDER_NOT_CONFIGURED: 'Provider 未配置',
+  PROVIDER_UNAVAILABLE: 'Provider 不可用',
+  INVALID_API_KEY: 'API Key 无效',
+  ACCESS_DENIED: '无权访问',
+  RATE_LIMITED: '请求被限流',
+  HTTP_ERROR: '网络请求错误',
+  SUBMIT_FAILED: '视频提交失败',
+  GENERATION_FAILED: '视频生成失败',
+  POLL_TIMEOUT: '生成超时',
+  PIPELINE_ERROR: 'Pipeline 异常',
+};
+
+export default function ProgressTimeline({ status, logs, error, failureDetail, modelUsed, creativeIntent }: Props) {
   const completed = status === 'COMPLETED';
   const failed = status === 'FAILED';
   const humanReview = status === 'HUMAN_REVIEW';
@@ -144,15 +171,109 @@ export default function ProgressTimeline({ status, logs, error }: Props) {
   return (
     <div>
       <Steps direction="vertical" size="small" items={items} />
+      {modelUsed && !failed && (
+        <div style={{ marginTop: 8, fontSize: 13 }}>
+          <Text type="secondary">视频模型: </Text>
+          <Tag color="blue">{modelUsed}</Tag>
+        </div>
+      )}
       {failed && error && (
         <div style={{ color: '#ff4d4f', marginTop: 8, fontSize: 13 }}>
           失败原因：{error}
+        </div>
+      )}
+      {failed && failureDetail && (
+        <div style={{ marginTop: 8, padding: '8px 12px', background: '#fff2f0', border: '1px solid #ffccc7', borderRadius: 6, fontSize: 13 }}>
+          {failureDetail.error_code && (
+            <div style={{ marginBottom: 4 }}>
+              <Text strong style={{ color: '#ff4d4f' }}>
+                {ERROR_CODE_LABELS[failureDetail.error_code] || failureDetail.error_code}
+              </Text>
+              {failureDetail.provider && (
+                <Tag style={{ marginLeft: 8, fontSize: 11 }}>{failureDetail.provider}</Tag>
+              )}
+            </div>
+          )}
+          {failureDetail.stage && (
+            <div style={{ color: '#666', marginBottom: 2 }}>
+              失败阶段: {failureDetail.stage}
+            </div>
+          )}
+          {failureDetail.reason && (
+            <div style={{ color: '#666', marginBottom: 2 }}>
+              详细原因: {failureDetail.reason}
+            </div>
+          )}
+          {failureDetail.input_files && Array.isArray(failureDetail.input_files) && failureDetail.input_files.length > 0 && (
+            <div style={{ color: '#666' }}>
+              已生成素材: {failureDetail.input_files.length} 个
+            </div>
+          )}
         </div>
       )}
       {humanReview && (
         <div style={{ color: '#faad14', marginTop: 8, fontSize: 13 }}>
           合规预审未通过且自动修订已耗尽,需人工审核
         </div>
+      )}
+      {creativeIntent && (
+        <Collapse
+          size="small"
+          style={{ marginTop: 12 }}
+          items={[{
+            key: 'intent',
+            label: (
+              <span>
+                <BulbFilled style={{ color: '#faad14', marginRight: 6 }} />
+                AI 已理解你的创意
+              </span>
+            ),
+            children: (
+              <Descriptions column={1} size="small" bordered>
+                {creativeIntent.concept && (
+                  <Descriptions.Item label="创意概念">{creativeIntent.concept}</Descriptions.Item>
+                )}
+                {creativeIntent.subject && (
+                  <Descriptions.Item label="主体">{creativeIntent.subject}</Descriptions.Item>
+                )}
+                {creativeIntent.subject_description && (
+                  <Descriptions.Item label="主体描述">{creativeIntent.subject_description}</Descriptions.Item>
+                )}
+                {creativeIntent.scene && (
+                  <Descriptions.Item label="场景">{creativeIntent.scene}</Descriptions.Item>
+                )}
+                {creativeIntent.action && (
+                  <Descriptions.Item label="动作">{creativeIntent.action}</Descriptions.Item>
+                )}
+                {creativeIntent.emotion && (
+                  <Descriptions.Item label="情绪">{creativeIntent.emotion}</Descriptions.Item>
+                )}
+                {creativeIntent.visual_style && (
+                  <Descriptions.Item label="视觉风格">{creativeIntent.visual_style}</Descriptions.Item>
+                )}
+                {creativeIntent.camera_style && (
+                  <Descriptions.Item label="镜头">{creativeIntent.camera_style}</Descriptions.Item>
+                )}
+                {creativeIntent.lighting && (
+                  <Descriptions.Item label="光线">{creativeIntent.lighting}</Descriptions.Item>
+                )}
+                {creativeIntent.color_mood && (
+                  <Descriptions.Item label="色彩">{creativeIntent.color_mood}</Descriptions.Item>
+                )}
+                {creativeIntent.creative_goal && (
+                  <Descriptions.Item label="创作目标">{creativeIntent.creative_goal}</Descriptions.Item>
+                )}
+                {creativeIntent.inferred_needs && creativeIntent.inferred_needs.length > 0 && (
+                  <Descriptions.Item label="推断需求">
+                    {creativeIntent.inferred_needs.map((n, i) => (
+                      <Tag key={i} style={{ marginBottom: 2 }}>{n}</Tag>
+                    ))}
+                  </Descriptions.Item>
+                )}
+              </Descriptions>
+            ),
+          }]}
+        />
       )}
     </div>
   );

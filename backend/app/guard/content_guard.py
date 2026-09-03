@@ -6,7 +6,7 @@
 调用约定:
 - 复用 LLMProvider(同 qwen-plus),不接外部 API
 - CONTENT_GUARD_PROMPT 约束输出 JSON schema
-- 失败时返回 safe=True + warnings(不阻断 Pipeline,预留接口)
+- 失败时返回 safe=False + human_review_required(进入人工审核,不自动放行)
 """
 from __future__ import annotations
 
@@ -23,7 +23,7 @@ RiskLevel = Literal["low", "medium", "high"]
 class ContentGuardReport(BaseModel):
     """ContentGuard 风险评估报告。"""
 
-    safe: bool = Field(True, description="整体是否可放行(low/medium 风险可放行,high 视配置)")
+    safe: bool = Field(False, description="整体是否可放行(需 LLM 确认 low/medium 风险后才设 True)")
     overall_risk: RiskLevel = Field("low", description="整体风险等级")
     safety_risk: RiskLevel = Field("low", description="内容安全风险(违法/色情/暴力/毒品/赌博/欺诈)")
     platform_risk: RiskLevel = Field("low", description="平台审核风险(敏感议题/严重争议)")
@@ -42,10 +42,13 @@ class ContentGuard:
         """对 storyboard 内容做三维度风险评估。
 
         在 _run_media 之前调用,避免高风险内容消耗素材生成 API。
-        失败时返回 safe=True + warnings,不阻断 Pipeline(预留阻断开关位置)。
+        LLM 调用失败时返回 safe=False(进入人工审核,不自动放行)。
         """
         if state.storyboard is None:
-            return ContentGuardReport(warnings=["storyboard 未生成,跳过预检查"])
+            return ContentGuardReport(
+                safe=False,
+                warnings=["storyboard 未生成,无法进行风险预检查"],
+            )
 
         # 提取需评估的内容字段
         shots_payload = []
@@ -74,8 +77,10 @@ class ContentGuard:
                 report.safe = False
             return report
         except Exception as e:
-            # 预检查失败不阻断 Pipeline,返回放行 + 警告
+            # LLM 调用失败:返回 safe=False,进入人工审核,不自动放行
             return ContentGuardReport(
-                safe=True,
-                warnings=[f"ContentGuard 预检查异常,已跳过: {type(e).__name__}: {e}"],
+                safe=False,
+                overall_risk="medium",
+                warnings=[f"ContentGuard 预检查异常(LLM 不可用): {type(e).__name__}: {e}"],
+                suggestions=["请检查 LLM API Key 和账户状态后重试"],
             )

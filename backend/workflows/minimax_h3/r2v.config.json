@@ -1,0 +1,48 @@
+{
+  "workflow_id": "minimax_h3_r2v_v1",
+  "provider": "comfy_cloud",
+  "category": "reference_to_video",
+  "model": "MiniMax H3",
+  "version": "1.0",
+  "file": "r2v.json",
+  "source": "https://github.com/Comfy-Org/workflow_templates/blob/main/templates/video_minimax_h3_r2v.json",
+  "description": "MiniMax H3 参考生成(官方模板):参考图 + prompt → 视频,适合人物一致性/风格/动作参考",
+  "inputs": {
+    "prompt": {
+      "type": "string",
+      "required": true,
+      "inject": { "kind": "node_widget", "node": 138, "widget": "value" },
+      "description": "视频生成提示词"
+    },
+    "ref_image_0": {
+      "type": "image",
+      "required": true,
+      "inject": { "kind": "node_widget", "node": 137, "widget": "image" },
+      "description": "参考图 1(云端上传后的文件名)"
+    },
+    "ref_image_1": {
+      "type": "image",
+      "required": false,
+      "inject": { "kind": "node_widget", "node": 139, "widget": "image" },
+      "description": "参考图 2(云端上传后的文件名)"
+    },
+    "width": {
+      "type": "integer",
+      "required": false,
+      "inject": { "kind": "node_widget", "node": 136, "widget": "width" },
+      "description": "输出宽度(32 对齐)"
+    },
+    "height": {
+      "type": "integer",
+      "required": false,
+      "inject": { "kind": "node_widget", "node": 136, "widget": "height" },
+      "description": "输出高度(32 对齐)"
+    },
+    "length": {
+      "type": "integer",
+      "required": false,
+      "inject": { "kind": "node_widget", "node": 136, "widget": "length" },
+      "description": "帧数(24fps,17 帧对齐);由 duration 换算"
+    }
+  }
+}

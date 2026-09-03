@@ -1,0 +1,48 @@
+{
+  "workflow_id": "minimax_h3_i2v_v1",
+  "provider": "comfy_cloud",
+  "category": "image_to_video",
+  "model": "MiniMax H3",
+  "version": "1.0",
+  "file": "i2v.json",
+  "source": "https://github.com/Comfy-Org/workflow_templates/blob/main/templates/video_minimax_h3_i2v.json",
+  "description": "MiniMax H3 图生视频(官方模板):首帧图 + prompt → 视频,支持首尾帧",
+  "inputs": {
+    "prompt": {
+      "type": "string",
+      "required": true,
+      "inject": { "kind": "subgraph_input", "node": 105, "input": "prompt" },
+      "description": "视频生成提示词"
+    },
+    "first_frame": {
+      "type": "image",
+      "required": true,
+      "inject": { "kind": "node_widget", "node": 114, "widget": "image" },
+      "description": "首帧图(云端上传后的文件名)"
+    },
+    "width": {
+      "type": "integer",
+      "required": false,
+      "inject": { "kind": "subgraph_input", "node": 105, "input": "width" },
+      "description": "输出宽度(32 对齐)"
+    },
+    "height": {
+      "type": "integer",
+      "required": false,
+      "inject": { "kind": "subgraph_input", "node": 105, "input": "height" },
+      "description": "输出高度(32 对齐)"
+    },
+    "duration": {
+      "type": "number",
+      "required": false,
+      "inject": { "kind": "subgraph_input", "node": 105, "input": "value_1" },
+      "description": "时长(秒),内部按 24fps 转帧"
+    },
+    "seed": {
+      "type": "integer",
+      "required": false,
+      "inject": { "kind": "subgraph_input", "node": 105, "input": "noise_seed" },
+      "description": "随机种子"
+    }
+  }
+}

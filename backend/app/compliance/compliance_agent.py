@@ -82,7 +82,7 @@ class TextComplianceAgent(BaseComplianceAgent):
 
         result.agent_version = AGENT_VERSION
         result.rules_version = self.rule_engine.version
-        result.model_name = getattr(self.llm, "model", "mock")
+        result.model_name = getattr(self.llm, "model", "unknown")
         return result
 
     def _coerce_result(self, data: Dict[str, Any], rule_hits: List[Dict[str, Any]]) -> ComplianceResult:

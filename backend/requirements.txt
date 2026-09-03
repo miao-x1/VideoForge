@@ -9,3 +9,10 @@ numpy
 openai
 httpx
 pytest
+sqlalchemy>=2.0
+aiosqlite
+python-jose[cryptography]
+bcrypt
+email-validator
+pymilvus
+milvus-lite

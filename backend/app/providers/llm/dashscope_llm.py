@@ -64,6 +64,35 @@ class DashScopeLLMProvider(LLMProvider):
             raise RuntimeError("DashScope LLM 缺少 API Key(请配置 .env: LLM_API_KEY 或 DASHSCOPE_API_KEY)")
         self.client = OpenAI(api_key=self.api_key, base_url=self.base_url, timeout=120)
 
+    async def describe_image(self, image_path: str, prompt: str = "描述这张图片的内容、主体、风格、色调和氛围") -> str:
+        """调用 Qwen-VL 多模态模型理解图片,返回文本描述。"""
+        import base64
+        import asyncio
+
+        def _call() -> str:
+            with open(image_path, "rb") as f:
+                b64 = base64.b64encode(f.read()).decode()
+            ext = image_path.rsplit(".", 1)[-1].lower()
+            mime = f"image/{ext}" if ext in ("png", "jpeg", "jpg", "gif", "webp") else "image/png"
+            resp = self.client.chat.completions.create(
+                model=settings.vl_model,
+                messages=[{
+                    "role": "user",
+                    "content": [
+                        {"type": "text", "text": prompt},
+                        {"type": "image_url", "image_url": {"url": f"data:{mime};base64,{b64}"}},
+                    ],
+                }],
+                temperature=0.3,
+            )
+            return resp.choices[0].message.content or ""
+
+        try:
+            return await asyncio.to_thread(_call)
+        except Exception as e:
+            logger.warning("图片理解失败 %s: %s", image_path, e)
+            return f"[图片理解失败] {e}"
+
     async def generate(self, *, task: str, context: Dict[str, Any]) -> Dict[str, Any]:
         if task not in PROMPTS:
             raise ValueError(f"未知 LLM 任务类型: {task}")
