@@ -8,8 +8,11 @@ from jose import JWTError, jwt
 from ..core.config import settings
 
 
-def create_access_token(user_id: str, email: str) -> str:
-    expire = datetime.now(timezone.utc) + timedelta(hours=settings.jwt_expire_hours)
+def create_access_token(user_id: str, email: str, remember: bool = False) -> str:
+    if remember:
+        expire = datetime.now(timezone.utc) + timedelta(days=settings.jwt_remember_days)
+    else:
+        expire = datetime.now(timezone.utc) + timedelta(hours=settings.jwt_expire_hours)
     payload = {"sub": user_id, "email": email, "exp": expire}
     return jwt.encode(payload, settings.jwt_secret, algorithm=settings.jwt_algorithm)
 

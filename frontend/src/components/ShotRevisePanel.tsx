@@ -5,7 +5,7 @@ import {
 import {
   EditOutlined, LockFilled, ReloadOutlined, UnlockOutlined,
 } from '@ant-design/icons';
-import { api } from '../api/client';
+import { api, mediaUrl } from '../api/client';
 
 const { Text } = Typography;
 
@@ -121,7 +121,7 @@ export default function ShotRevisePanel({ taskId, shots, onReviseStarted, onLock
         dataSource={shots}
         renderItem={(shot, i) => {
           const imgFile = shot.image_path?.split(/[\\/]/).pop();
-          const imgUrl = imgFile ? `/storage/images/${imgFile}` : null;
+          const imgUrl = imgFile ? mediaUrl(`/storage/images/${imgFile}`) : null;
           return (
             <List.Item
               actions={[

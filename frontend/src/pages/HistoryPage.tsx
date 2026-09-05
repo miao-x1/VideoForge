@@ -1,101 +1,98 @@
-﻿import { useEffect, useState } from 'react';
+﻿import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Layout, Card, Table, Tag, Button, Typography, Space, Input, Empty } from 'antd';
-import { SearchOutlined } from '@ant-design/icons';
+import {
+  Button, Card, Empty, Input, Layout, Modal, Popconfirm, Select, Space, Tag, Typography, message,
+} from 'antd';
+import {
+  DeleteOutlined, EditOutlined, PlayCircleOutlined, PlusOutlined, SearchOutlined,
+} from '@ant-design/icons';
 import Sidebar from '../components/Sidebar';
 import UserMenu from '../components/UserMenu';
-import { api, type TaskBrief, type SearchResult } from '../api/client';
+import { mediaUrl } from '../api/client';
+import {
+  deleteWork, fetchUserWorks, updateWorkTitle, type GenerationVersion,
+} from '../director/generationApi';
 import { colors } from '../theme';
 
 const { Title, Text, Paragraph } = Typography;
 
-const STATUS_COLORS: Record<string, string> = {
-  PENDING: 'default',
-  ANALYZING: 'processing',
-  SCRIPTING: 'processing',
-  COMPLIANCE_CHECKING: 'processing',
-  STORYBOARDING: 'processing',
-  GENERATING_ASSETS: 'processing',
-  ASSEMBLING: 'processing',
-  COMPLETED: 'success',
-  FAILED: 'error',
-  HUMAN_REVIEW: 'warning',
-};
+function formatTime(ts?: number): string {
+  if (!ts) return '';
+  const ms = ts < 1e12 ? ts * 1000 : ts;
+  const d = new Date(ms);
+  if (Number.isNaN(d.getTime())) return '';
+  return d.toLocaleString('zh-CN', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+}
+
+function statusTag(status: string) {
+  if (status === 'completed') return <Tag color="success">已完成</Tag>;
+  if (status === 'running' || status === 'pending') return <Tag color="processing">生成中</Tag>;
+  if (status === 'failed') return <Tag color="error">失败</Tag>;
+  return <Tag>{status}</Tag>;
+}
 
 export default function HistoryPage() {
   const navigate = useNavigate();
-  const [tasks, setTasks] = useState<TaskBrief[]>([]);
+  const [items, setItems] = useState<GenerationVersion[]>([]);
   const [loading, setLoading] = useState(true);
+  const [kind, setKind] = useState<'all' | 'video' | 'image'>('all');
+  const [query, setQuery] = useState('');
+  const [appliedQuery, setAppliedQuery] = useState('');
+  const [playing, setPlaying] = useState<GenerationVersion | null>(null);
+  const [renaming, setRenaming] = useState<GenerationVersion | null>(null);
+  const [titleDraft, setTitleDraft] = useState('');
 
-  const [searchQuery, setSearchQuery] = useState('');
-  const [searchResults, setSearchResults] = useState<SearchResult[] | null>(null);
-  const [searching, setSearching] = useState(false);
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const rows = await fetchUserWorks(kind === 'all' ? '' : kind, appliedQuery.trim() || undefined);
+      setItems(rows);
+    } catch {
+      message.error('加载历史作品失败');
+      setItems([]);
+    } finally {
+      setLoading(false);
+    }
+  }, [kind, appliedQuery]);
 
   useEffect(() => {
-    api.listTasks()
-      .then(setTasks)
-      .catch(() => {})
-      .finally(() => setLoading(false));
-  }, []);
+    void load();
+  }, [load]);
 
-  const handleSearch = async () => {
-    const q = searchQuery.trim();
-    if (!q) {
-      setSearchResults(null);
+  const visible = useMemo(() => items, [items]);
+
+  const startRename = (row: GenerationVersion) => {
+    setRenaming(row);
+    setTitleDraft(row.title || row.prompt || '');
+  };
+
+  const saveRename = async () => {
+    if (!renaming) return;
+    const title = titleDraft.trim();
+    if (!title) {
+      message.warning('请填写作品名称');
       return;
     }
-    setSearching(true);
     try {
-      const results = await api.searchVideos(q);
-      setSearchResults(results);
-    } catch {
-      setSearchResults([]);
-    } finally {
-      setSearching(false);
+      const updated = await updateWorkTitle(renaming.generation_id, title);
+      setItems((prev) => prev.map((row) => (row.generation_id === updated.generation_id ? { ...row, ...updated } : row)));
+      setRenaming(null);
+      message.success('已改名');
+    } catch (e: unknown) {
+      message.error(e instanceof Error ? e.message : '改名失败');
     }
   };
 
-  const columns = [
-    {
-      title: '创意',
-      dataIndex: 'user_input',
-      key: 'user_input',
-      ellipsis: true,
-      width: '40%',
-    },
-    {
-      title: '状态',
-      dataIndex: 'status',
-      key: 'status',
-      render: (status: string) => <Tag color={STATUS_COLORS[status] || 'default'}>{status}</Tag>,
-    },
-    {
-      title: '创建时间',
-      dataIndex: 'created_at',
-      key: 'created_at',
-      render: (ts: number) => new Date(ts * 1000).toLocaleString('zh-CN'),
-    },
-    {
-      title: '模型',
-      dataIndex: 'model_used',
-      key: 'model_used',
-      render: (model: string) => model ? <Tag>{model}</Tag> : <Text type="secondary">-</Text>,
-    },
-    {
-      title: '操作',
-      key: 'action',
-      render: (_: any, record: TaskBrief) => (
-        <Button
-          type="link"
-          size="small"
-          onClick={() => navigate(`/?task=${record.task_id}`)}
-          disabled={record.status === 'PENDING' || record.status === 'FAILED'}
-        >
-          查看结果
-        </Button>
-      ),
-    },
-  ];
+  const remove = async (row: GenerationVersion) => {
+    try {
+      await deleteWork(row.generation_id);
+      setItems((prev) => prev.filter((item) => item.generation_id !== row.generation_id));
+      if (playing?.generation_id === row.generation_id) setPlaying(null);
+      message.success('已删除');
+    } catch (e: unknown) {
+      message.error(e instanceof Error ? e.message : '删除失败');
+    }
+  };
 
   return (
     <div style={{ display: 'flex', height: '100vh', background: colors.bg }}>
@@ -113,85 +110,147 @@ export default function HistoryPage() {
             borderBottom: `1px solid ${colors.border}`,
           }}
         >
-          <Title level={4} style={{ margin: 0 }}>我的视频历史</Title>
+          <Title level={4} style={{ margin: 0, fontWeight: 500, letterSpacing: '0.06em' }}>历史作品</Title>
           <UserMenu />
         </Layout.Header>
         <Layout.Content style={{ padding: 24, overflow: 'auto' }}>
-          <div style={{ maxWidth: 960, margin: '0 auto' }}>
+          <div style={{ maxWidth: 1080, margin: '0 auto' }}>
+            <Card style={{ marginBottom: 16 }}>
+              <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'center' }}>
+                <Input
+                  allowClear
+                  prefix={<SearchOutlined />}
+                  placeholder="搜索作品名或提示词"
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  onPressEnter={() => setAppliedQuery(query)}
+                  style={{ maxWidth: 320 }}
+                />
+                <Select
+                  value={kind}
+                  style={{ width: 120 }}
+                  onChange={(v) => setKind(v)}
+                  options={[
+                    { value: 'all', label: '全部' },
+                    { value: 'video', label: '视频' },
+                    { value: 'image', label: '图片' },
+                  ]}
+                />
+                <Button onClick={() => { setAppliedQuery(query); if (query === appliedQuery) void load(); }} loading={loading}>刷新</Button>
+                <div style={{ flex: 1 }} />
+                <Button type="primary" icon={<PlusOutlined />} onClick={() => navigate('/director')}>
+                  去导演台生成
+                </Button>
+              </div>
+              <Paragraph type="secondary" style={{ margin: '12px 0 0' }}>
+                这里是当前账号已经生成的成片。生成过程中也可以打开、改名或删除。
+              </Paragraph>
+            </Card>
 
-      <Card style={{ marginBottom: 16 }}>
-        <Text type="secondary">语义搜索历史视频</Text>
-        <Space.Compact style={{ width: '100%', marginTop: 8 }}>
-          <Input
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="输入关键词搜索,如「搞笑」「古代人」"
-            onPressEnter={handleSearch}
-            prefix={<SearchOutlined />}
-            allowClear
-          />
-          <Button type="primary" onClick={handleSearch} loading={searching}>
-            搜索
-          </Button>
-        </Space.Compact>
-
-        {searchResults !== null && (
-          <div style={{ marginTop: 16 }}>
-            {searchResults.length === 0 ? (
-              <Empty description="未找到相关视频" />
+            {visible.length === 0 && !loading ? (
+              <Empty
+                description="还没有成片，去导演台生成。"
+                image={Empty.PRESENTED_IMAGE_SIMPLE}
+              >
+                <Button type="primary" onClick={() => navigate('/director')}>进入导演台</Button>
+              </Empty>
             ) : (
-              <div>
-                <Paragraph type="secondary" style={{ marginBottom: 8 }}>
-                  找到 {searchResults.length} 个相关视频(按语义相似度排序)
-                </Paragraph>
-                {searchResults.map((r) => (
-                  <Card
-                    key={r.video_id}
-                    size="small"
-                    style={{ marginBottom: 8 }}
-                    onClick={() => navigate(`/?task=${r.video_id}`)}
-                    hoverable
-                  >
-                    <Space direction="vertical" size={4} style={{ width: '100%' }}>
-                      <Space>
-                        <Text strong>{r.metadata.title || r.video_id}</Text>
-                        {r.metadata.quality_grade && (
-                          <Tag color="gold">质量 {r.metadata.quality_grade}</Tag>
-                        )}
-                        <Tag color="blue">相似度 {(r.score * 100).toFixed(0)}%</Tag>
-                      </Space>
-                      <Text type="secondary" style={{ fontSize: 12 }}>
-                        {r.semantic_description}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 16 }}>
+                {visible.map((row) => {
+                  const preview = row.url ? mediaUrl(row.url) : '';
+                  return (
+                    <Card
+                      key={row.generation_id}
+                      hoverable
+                      styles={{ body: { padding: 12 } }}
+                      cover={
+                        preview && row.kind === 'video' ? (
+                          <video
+                            src={preview}
+                            muted
+                            playsInline
+                            preload="metadata"
+                            style={{ width: '100%', height: 168, objectFit: 'cover', background: '#111', display: 'block' }}
+                          />
+                        ) : preview && row.kind === 'image' ? (
+                          <img
+                            src={preview}
+                            alt={row.title || '作品'}
+                            style={{ width: '100%', height: 168, objectFit: 'cover', display: 'block' }}
+                          />
+                        ) : (
+                          <div style={{ height: 168, background: '#ece8e0', display: 'flex', alignItems: 'center', justifyContent: 'center', color: colors.textMuted }}>
+                            {row.status === 'running' || row.status === 'pending' ? '生成中…' : '暂无预览'}
+                          </div>
+                        )
+                      }
+                    >
+                      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8, marginBottom: 8 }}>
+                        <Text strong ellipsis style={{ flex: 1 }}>
+                          {row.title || row.prompt || '未命名作品'}
+                        </Text>
+                        {statusTag(row.status)}
+                      </div>
+                      <Text type="secondary" style={{ fontSize: 12, display: 'block', marginBottom: 10 }}>
+                        {row.kind === 'video' ? '视频' : '图片'}
+                        {row.aspect_ratio ? ` · ${row.aspect_ratio}` : ''}
+                        {row.duration ? ` · ${row.duration}s` : ''}
+                        {row.created_at ? ` · ${formatTime(row.created_at)}` : ''}
                       </Text>
-                      {r.metadata.tags && r.metadata.tags.length > 0 && (
-                        <Space size={4} wrap>
-                          {r.metadata.tags.map((tag, i) => (
-                            <Tag key={i}>{tag}</Tag>
-                          ))}
-                        </Space>
-                      )}
-                    </Space>
-                  </Card>
-                ))}
+                      <Space size={6} wrap>
+                        <Button size="small" icon={<PlayCircleOutlined />} disabled={!preview} onClick={() => setPlaying(row)}>
+                          查看
+                        </Button>
+                        <Button size="small" icon={<EditOutlined />} onClick={() => startRename(row)}>
+                          改名
+                        </Button>
+                        <Popconfirm title="删除这件作品？" description="删除后无法从历史里找回。" onConfirm={() => void remove(row)}>
+                          <Button size="small" danger icon={<DeleteOutlined />}>删除</Button>
+                        </Popconfirm>
+                      </Space>
+                    </Card>
+                  );
+                })}
               </div>
             )}
           </div>
-        )}
-      </Card>
-
-      <Card>
-        <Table
-          dataSource={tasks}
-          columns={columns}
-          rowKey="task_id"
-          loading={loading}
-          pagination={{ pageSize: 10 }}
-          locale={{ emptyText: '暂无生成记录' }}
-        />
-      </Card>
-          </div>
         </Layout.Content>
       </Layout>
+
+      <Modal
+        title={playing?.title || '作品预览'}
+        open={!!playing}
+        onCancel={() => setPlaying(null)}
+        footer={null}
+        width={720}
+        destroyOnClose
+      >
+        {playing?.url && playing.kind === 'video' && (
+          <video src={mediaUrl(playing.url)} controls autoPlay style={{ width: '100%', borderRadius: 8 }} />
+        )}
+        {playing?.url && playing.kind === 'image' && (
+          <img src={mediaUrl(playing.url)} alt={playing.title || ''} style={{ width: '100%', borderRadius: 8 }} />
+        )}
+        {playing?.prompt && (
+          <Paragraph type="secondary" style={{ marginTop: 12, marginBottom: 0 }}>{playing.prompt}</Paragraph>
+        )}
+      </Modal>
+
+      <Modal
+        title="修改作品名称"
+        open={!!renaming}
+        onCancel={() => setRenaming(null)}
+        onOk={() => void saveRename()}
+        okText="保存"
+      >
+        <Input
+          value={titleDraft}
+          maxLength={128}
+          onChange={(e) => setTitleDraft(e.target.value)}
+          onPressEnter={() => void saveRename()}
+          placeholder="作品名称"
+        />
+      </Modal>
     </div>
   );
 }

@@ -1,4 +1,4 @@
-/* VideoForge 全局基础样式 */
+/* VideoForge 全局：高级简约 */
 
 * {
   box-sizing: border-box;
@@ -13,33 +13,170 @@ body,
 }
 
 body {
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC',
-    'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
+  font-family: 'PingFang SC', 'Hiragino Sans GB', 'Noto Serif SC', 'Songti SC',
+    'Microsoft YaHei', -apple-system, BlinkMacSystemFont, sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  background: #f0f2f5;
+  background: #f3f1ec;
+  color: #1c1b19;
 }
 
-/* 统一细滚动条 */
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: rgba(0, 0, 0, 0.18);
+  background: rgba(28, 27, 25, 0.16);
   border-radius: 3px;
-}
-
-::-webkit-scrollbar-thumb:hover {
-  background: rgba(0, 0, 0, 0.28);
 }
 
 ::-webkit-scrollbar-track {
   background: transparent;
 }
 
-/* 品牌色文字选中 */
 ::selection {
-  background: rgba(102, 126, 234, 0.25);
+  background: rgba(143, 115, 80, 0.22);
+}
+
+/* 登录页背景：暖纸、细网格、大字号水印 */
+.auth-shell {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 32px 16px;
+  position: relative;
+  overflow: hidden;
+  background:
+    radial-gradient(ellipse 80% 60% at 50% -10%, rgba(255, 255, 255, 0.7), transparent 55%),
+    radial-gradient(ellipse 50% 40% at 100% 100%, rgba(143, 115, 80, 0.06), transparent 50%),
+    #f3f1ec;
+}
+
+.auth-shell::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(28, 27, 25, 0.035) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(28, 27, 25, 0.035) 1px, transparent 1px);
+  background-size: 64px 64px;
+  mask-image: radial-gradient(ellipse 70% 60% at 50% 45%, #000 20%, transparent 75%);
+  pointer-events: none;
+}
+
+.auth-shell::after {
+  content: 'VIDEOFORGE';
+  position: absolute;
+  left: 50%;
+  top: 46%;
+  transform: translate(-50%, -50%);
+  font-size: clamp(64px, 14vw, 180px);
+  letter-spacing: 0.28em;
+  font-weight: 300;
+  color: rgba(28, 27, 25, 0.035);
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+.auth-card {
+  width: 420px;
+  max-width: 100%;
+  position: relative;
+  z-index: 1;
+  background: rgba(255, 252, 247, 0.92);
+  border: 1px solid #e6e1d8;
+  border-radius: 12px;
+  padding: 40px 36px 28px;
+  backdrop-filter: blur(16px);
+}
+
+.auth-mark {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-bottom: 28px;
+}
+
+.auth-mark .word {
+  font-size: 22px;
+  font-weight: 500;
+  letter-spacing: 0.28em;
+  color: #1c1b19;
+  text-indent: 0.28em;
+}
+
+.auth-mark .line {
+  width: 28px;
+  height: 1px;
+  background: #8f7350;
+  margin: 14px 0 12px;
+}
+
+.auth-mark .sub {
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  color: #8a8680;
+}
+
+.auth-card .ant-tabs-nav::before {
+  border-bottom-color: #e6e1d8 !important;
+}
+
+.auth-card .ant-input-affix-wrapper,
+.auth-card .ant-input {
+  background: #fffcf7;
+}
+
+.auth-captcha {
+  width: 120px;
+  height: 40px;
+  border: 1px solid #e6e1d8;
+  border-radius: 6px;
+  overflow: hidden;
+  cursor: pointer;
+  background: #f7f5f1;
+  flex-shrink: 0;
+}
+
+.auth-foot {
+  display: block;
+  margin-top: 20px;
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  text-align: center;
+  color: #8a8680;
+}
+
+.director-dark-panel .ant-typography,
+.director-dark-panel .ant-tabs-tab {
+  color: #8a8680;
+}
+
+.cinema-topbar input {
+  background: transparent !important;
+}
+
+.director-dark-panel .ant-tabs-tab-active {
+  color: #f4f1ea !important;
+}
+
+.director-dark-panel ::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.14);
+}
+
+/* 信息标签去掉高饱和色，只保留语义色（成功/警告/失败） */
+.ant-tag-blue,
+.ant-tag-geekblue,
+.ant-tag-purple,
+.ant-tag-cyan,
+.ant-tag-magenta {
+  color: #5c5852 !important;
+  background: #f4f1ea !important;
+  border-color: #e6e1d8 !important;
+}
+
+.ant-card {
+  box-shadow: none !important;
 }

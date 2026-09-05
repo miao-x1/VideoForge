@@ -1,14 +1,14 @@
 import { useNavigate, useLocation } from 'react-router-dom';
 import { Tooltip } from 'antd';
-import { ClockCircleOutlined, VideoCameraOutlined } from '@ant-design/icons';
-import { brand, colors, radius } from '../theme';
+import { HistoryOutlined, VideoCameraOutlined } from '@ant-design/icons';
+import { colors, radius } from '../theme';
 
 export default function Sidebar() {
   const navigate = useNavigate();
   const location = useLocation();
 
-  const isStudio = location.pathname === '/';
   const isHistory = location.pathname === '/history';
+  const isDirector = location.pathname === '/director' || location.pathname === '/';
 
   const navItemStyle = (active: boolean): React.CSSProperties => ({
     width: 40,
@@ -18,8 +18,8 @@ export default function Sidebar() {
     alignItems: 'center',
     justifyContent: 'center',
     cursor: 'pointer',
-    background: active ? brand.tint : 'transparent',
-    color: active ? brand.primary : colors.sidebarMuted,
+    background: active ? 'rgba(199, 184, 156, 0.14)' : 'transparent',
+    color: active ? '#c7b89c' : colors.sidebarMuted,
     fontSize: 18,
     transition: 'all 0.2s',
   });
@@ -37,40 +37,38 @@ export default function Sidebar() {
         flexShrink: 0,
       }}
     >
-      {/* Logo */}
       <div
         style={{
-          width: 40,
-          height: 40,
-          borderRadius: radius.control,
-          background: brand.gradient,
+          width: 36,
+          height: 36,
+          borderRadius: 8,
+          border: '1px solid rgba(199, 184, 156, 0.35)',
+          background: 'transparent',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          color: '#fff',
-          fontSize: 18,
-          fontWeight: 'bold',
-          marginBottom: 24,
+          color: '#c7b89c',
+          fontSize: 13,
+          letterSpacing: '0.04em',
+          fontWeight: 500,
+          marginBottom: 28,
         }}
       >
-        V
+        VF
       </div>
 
-      {/* 导航 */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-        <Tooltip title="创作工作台" placement="right">
-          <div onClick={() => navigate('/')} style={navItemStyle(isStudio)}>
+        <Tooltip title="导演台" placement="right">
+          <div onClick={() => navigate('/director')} style={navItemStyle(isDirector)}>
             <VideoCameraOutlined />
           </div>
         </Tooltip>
-        <Tooltip title="历史视频" placement="right">
+        <Tooltip title="历史作品" placement="right">
           <div onClick={() => navigate('/history')} style={navItemStyle(isHistory)}>
-            <ClockCircleOutlined />
+            <HistoryOutlined />
           </div>
         </Tooltip>
       </div>
-
-      {/* 底部留空，UserMenu 由 Header 承载 */}
       <div style={{ flex: 1 }} />
     </div>
   );

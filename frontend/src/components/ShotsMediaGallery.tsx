@@ -1,6 +1,6 @@
 import { Card, Col, Empty, Row, Tag, Typography } from 'antd';
 import { LockFilled } from '@ant-design/icons';
-import type { InputSourceItem } from '../api/client';
+import { mediaUrl as withAccessToken, type InputSourceItem } from '../api/client';
 
 const { Text, Paragraph } = Typography;
 
@@ -22,7 +22,7 @@ export function mediaUrl(
 ): string | null {
   if (!path) return null;
   const name = path.split(/[\\/]/).pop();
-  return name ? `/storage/${kind}/${name}` : null;
+  return name ? withAccessToken(`/storage/${kind}/${name}`) : null;
 }
 
 interface Props {

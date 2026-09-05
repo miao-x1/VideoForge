@@ -1,4 +1,8 @@
 """测试公共 fixtures。"""
+import os
+
+os.environ.setdefault("APP_ENV", "test")
+
 import asyncio
 
 import pytest

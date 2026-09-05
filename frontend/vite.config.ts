@@ -6,9 +6,12 @@ export default defineConfig({
   plugins: [react()],
   server: {
     port: 5173,
+    host: '127.0.0.1',
     proxy: {
-      '/api': { target: 'http://localhost:8000', changeOrigin: true },
-      '/storage': { target: 'http://localhost:8000', changeOrigin: true },
+      // 必须用 127.0.0.1：Windows 上 localhost 常解析到 ::1，
+      // 后端只绑 IPv4 时，验证码等 /api 请求会打到错误进程并 404。
+      '/api': { target: 'http://127.0.0.1:8000', changeOrigin: true },
+      '/storage': { target: 'http://127.0.0.1:8000', changeOrigin: true },
     },
   },
 });

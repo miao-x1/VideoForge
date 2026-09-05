@@ -23,8 +23,10 @@ class Settings(BaseSettings):
     app_port: int = 8000
     debug: bool = True
 
-    # 环境控制:production 禁止 Mock，test 允许 Mock
-    app_env: Literal["production", "test"] = "production"
+    # 环境：development / test / production。默认开发，禁止生产默连。
+    app_env: Literal["development", "dev", "test", "production"] = "development"
+    # 空则开发环境回退本地 SQLite；生产必须显式配置
+    database_url: str = ""
     enable_mock_providers: bool = False  # 仅 APP_ENV=test 时可设 True
 
     # Provider 选择 (生产默认全部使用真实 Provider)
@@ -82,17 +84,33 @@ class Settings(BaseSettings):
     compliance_halt_on_review: bool = False
 
     # JWT 鉴权
-    jwt_secret: str = "videoforge-dev-secret-change-in-production"
+    jwt_secret: str = "videoforge-dev-secret-change-in-production"  # 仅 development/test；production 启动会拒绝
     jwt_algorithm: str = "HS256"
     jwt_expire_hours: int = 72
+    jwt_remember_days: int = 30
 
-    # CORS 允许来源(逗号分隔,空则允许全部)
+    # 登录注册：未配置短信/SMTP 时回显验证码，方便本地使用
+    auth_dev_echo_code: bool = True
+    sms_access_key: str = ""
+    sms_access_secret: str = ""
+    sms_sign_name: str = ""
+    sms_template_code: str = ""
+    smtp_host: str = ""
+    smtp_port: int = 465
+    smtp_user: str = ""
+    smtp_password: str = ""
+    smtp_from: str = ""
+
+    # CORS 允许来源(逗号分隔)。开发空则回退 localhost；生产必须显式配置且禁止 *
     cors_origins: str = ""
 
     # 多模态:图片理解模型(Qwen-VL 系列)
     vl_model: str = "qwen-vl-max"
     # 文件上传限制(MB)
     upload_max_size_mb: int = 20
+
+    # 3D 导演台：图生 3D。none = 未接入，任务会真实失败，禁止假装成功。
+    image_to_3d_provider: Literal["none"] = "none"
 
     # RAG:视频历史库 + 向量检索
     embedding_model: str = "text-embedding-v3"

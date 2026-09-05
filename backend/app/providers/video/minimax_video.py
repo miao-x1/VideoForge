@@ -47,12 +47,17 @@ def _parse_v2_error(resp: dict) -> ProviderError | None:
 
 
 class MiniMaxVideoProvider(VideoModelProvider):
-    def __init__(self) -> None:
-        self.api_key = settings.minimax_api_key
+    def __init__(
+        self,
+        api_key: str | None = None,
+        base_url: str | None = None,
+        model: str | None = None,
+    ) -> None:
+        self.api_key = api_key or settings.minimax_api_key
         if not self.api_key:
             raise RuntimeError("MiniMax 视频生成缺少 API Key")
-        self._model = settings.minimax_video_model or "MiniMax-H3"
-        self.base_url = settings.minimax_base_url.rstrip("/")
+        self._model = model or settings.minimax_video_model or "MiniMax-H3"
+        self.base_url = (base_url or settings.minimax_base_url).rstrip("/")
 
     @property
     def name(self) -> str:
@@ -189,9 +194,13 @@ class MiniMaxVideoProvider(VideoModelProvider):
     @staticmethod
     def _encode_image(image_path: str) -> str:
         """本地图片 → data URI(H3 支持 base64 输入;关键帧 PNG 通常 <2MB,远低于 64MB 限制)。"""
-        with open(image_path, "rb") as f:
-            b64 = base64.b64encode(f.read()).decode("ascii")
-        return f"data:image/png;base64,{b64}"
+        path = Path(str(image_path).split("?", 1)[0].split("#", 1)[0])
+        if not path.is_file():
+            raise ProviderError("video/minimax", f"首帧图片不存在：{path.name}", error_code="BAD_IMAGE")
+        data = path.read_bytes()
+        suffix = path.suffix.lower().lstrip(".") or "png"
+        mime = "image/jpeg" if suffix in {"jpg", "jpeg"} else f"image/{suffix}"
+        return f"data:{mime};base64,{base64.b64encode(data).decode('ascii')}"
 
     @staticmethod
     def _download(url: str) -> bytes:

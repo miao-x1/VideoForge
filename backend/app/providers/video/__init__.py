@@ -18,11 +18,18 @@ def _is_mock_allowed() -> bool:
     return settings.app_env == "test" and settings.enable_mock_providers
 
 
-def get_video_provider(provider: str | None = None) -> VideoModelProvider:
+def get_video_provider(
+    provider: str | None = None,
+    *,
+    api_key: str | None = None,
+    base_url: str | None = None,
+    model: str | None = None,
+) -> VideoModelProvider:
     """返回视频模型 Provider 实例。
 
     Args:
         provider: 可选,覆盖配置中的 provider 选择(用于 preferred_model)
+        api_key / base_url / model: 用户自带 Key 或平台解析后的覆盖项
     """
     # 测试模式显式配置 mock 时,路由覆盖不应切换回真实 Provider
     if _is_mock_allowed() and settings.video_model_provider == "mock":
@@ -37,18 +44,20 @@ def get_video_provider(provider: str | None = None) -> VideoModelProvider:
             choice = "qwen"
 
     if choice == "qwen":
-        if not (settings.qwen_api_key or settings.llm_api_key or settings.dashscope_api_key):
+        qwen_key = api_key or settings.qwen_api_key or settings.llm_api_key or settings.dashscope_api_key
+        if not qwen_key:
             raise ProviderNotConfiguredError("video/qwen", "未配置 Qwen API Key")
         from .qwen_video import QwenVideoProvider
-        logger.info("视频模型: qwen (%s)", settings.qwen_video_model)
-        return QwenVideoProvider()
+        logger.info("视频模型: qwen (%s)", model or settings.qwen_video_model)
+        return QwenVideoProvider(api_key=qwen_key, model=model)
 
     if choice == "minimax":
-        if not settings.minimax_api_key:
+        minimax_key = api_key or settings.minimax_api_key
+        if not minimax_key:
             raise ProviderNotConfiguredError("video/minimax", "未配置 MINIMAX_API_KEY")
         from .minimax_video import MiniMaxVideoProvider
-        logger.info("视频模型: minimax (%s)", settings.minimax_video_model)
-        return MiniMaxVideoProvider()
+        logger.info("视频模型: minimax (%s)", model or settings.minimax_video_model)
+        return MiniMaxVideoProvider(api_key=minimax_key, base_url=base_url, model=model)
 
     if choice == "comfy":
         if not settings.comfy_api_key:

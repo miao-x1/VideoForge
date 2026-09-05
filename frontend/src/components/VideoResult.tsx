@@ -15,7 +15,7 @@ import {
   WarningFilled,
   CloseCircleFilled,
 } from '@ant-design/icons';
-import type { ResultResp } from '../api/client';
+import { mediaUrl, type ResultResp } from '../api/client';
 
 const { Title, Text } = Typography;
 
@@ -183,8 +183,8 @@ export default function VideoResult({ result }: Props) {
               renderItem={(shot: any, i: number) => {
                 const imgFile = shot.image_path?.split(/[\\/]/).pop();
                 const audioFile = shot.audio_path?.split(/[\\/]/).pop();
-                const imgUrl = imgFile ? `/storage/images/${imgFile}` : null;
-                const audioUrl = audioFile ? `/storage/audio/${audioFile}` : null;
+                const imgUrl = imgFile ? mediaUrl(`/storage/images/${imgFile}`) : null;
+                const audioUrl = audioFile ? mediaUrl(`/storage/audio/${audioFile}`) : null;
                 return (
                   <List.Item>
                     <div style={{ width: '100%' }}>

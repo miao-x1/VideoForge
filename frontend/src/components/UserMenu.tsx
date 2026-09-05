@@ -1,5 +1,5 @@
 import { Dropdown, Space, Typography, Button } from 'antd';
-import { UserOutlined, LogoutOutlined, HistoryOutlined } from '@ant-design/icons';
+import { UserOutlined, LogoutOutlined, HistoryOutlined, GlobalOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import type { MenuProps } from 'antd';
 import { useAuth } from '../hooks/useAuth';
@@ -12,8 +12,14 @@ export default function UserMenu() {
     {
       key: 'history',
       icon: <HistoryOutlined />,
-      label: '我的视频',
+      label: '历史作品',
       onClick: () => navigate('/history'),
+    },
+    {
+      key: 'director',
+      icon: <GlobalOutlined />,
+      label: '导演台',
+      onClick: () => navigate('/director'),
     },
     { type: 'divider' },
     {

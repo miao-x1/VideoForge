@@ -43,11 +43,11 @@ def _parse_dashscope_error(resp: dict) -> ProviderError | None:
 
 
 class QwenVideoProvider(VideoModelProvider):
-    def __init__(self) -> None:
-        self.api_key = settings.qwen_api_key or settings.llm_api_key or settings.dashscope_api_key
+    def __init__(self, api_key: str | None = None, model: str | None = None) -> None:
+        self.api_key = api_key or settings.qwen_api_key or settings.llm_api_key or settings.dashscope_api_key
         if not self.api_key:
             raise RuntimeError("Qwen 视频生成缺少 API Key")
-        self._model = settings.qwen_video_model or "wan2.6-i2v-flash"
+        self._model = model or settings.qwen_video_model or "wan2.6-i2v-flash"
         self.submit_url = "https://dashscope.aliyuncs.com/api/v1/services/aigc/video-generation/video-synthesis"
 
     @property

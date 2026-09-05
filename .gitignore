@@ -17,15 +17,33 @@ frontend/dist/
 frontend/.vite/
 npm-debug.log*
 
+# 本地数据库（已被 Git 跟踪的历史文件不要用 git rm 删除工作区副本）
+*.db
+*.sqlite
+*.sqlite3
+storage/*.db
+storage/videoforge.db
+storage/milvus.db
+
 # 生成的产物(视频/图片/音频/临时文件)
 storage/images/
 storage/audio/
 storage/videos/
 storage/clips/
+storage/director/
+storage/projects/
+storage/uploads/
 storage/*.mp4
 storage/*.png
 storage/*.wav
 storage/audit/
+
+# 本地一次性审计/检查脚本
+backend/_audit_*.py
+backend/_check_*.py
+backend/_inspect_*.py
+backend/_w*_*.py
+storage/_audit_*.py
 
 # 调试预览 HTML
 storage/videos/*.html

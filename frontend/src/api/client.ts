@@ -414,9 +414,92 @@ export interface ResultResp {
 export interface UserOut {
   id: string;
   email: string;
+  phone?: string;
   display_name: string;
   created_at: number;
 }
+
+export interface CaptchaResp {
+  captcha_id: string;
+  image: string;
+  debug_text?: string | null;
+}
+
+export interface SendCodeResp {
+  ok: boolean;
+  cooldown: number;
+  message: string;
+  dev_code?: string | null;
+}
+
+export interface AuthStatus {
+  sms_configured: boolean;
+  email_configured: boolean;
+  password_login: boolean;
+}
+
+export interface BillingPackage {
+  id: string;
+  yuan: number;
+  fen: number;
+  label: string;
+}
+
+export interface BillingCatalogItem {
+  provider: string;
+  model: string;
+  label: string;
+  price_fen_per_sec: number;
+  available: boolean;
+  region: string;
+}
+
+export interface BillingCredential {
+  provider: string;
+  last4: string;
+  base_url: string;
+  enabled: boolean;
+}
+
+export interface BillingLedgerItem {
+  id: number;
+  delta_fen: number;
+  balance_after: number;
+  kind: string;
+  note: string;
+  created_at: number;
+}
+
+export interface BillingStatus {
+  video_source: 'platform' | 'own';
+  video_provider: string;
+  video_model: string;
+  wallet: { balance_fen: number; balance_yuan: string };
+  credentials: BillingCredential[];
+  catalog: BillingCatalogItem[];
+  packages: BillingPackage[];
+  price_fen_per_sec: number;
+  dev_recharge: boolean;
+  platform_ready: boolean;
+  wallet_kind?: 'platform_ledger';
+  recharge_kind?: 'dev_credit' | 'payment_pending';
+  wallet_note?: string;
+  minimax_note?: string;
+}
+
+export const billingApi = {
+  status: () => http.get<BillingStatus>('/api/billing/status').then((r) => r.data),
+  updatePrefs: (data: { video_source?: 'platform' | 'own'; video_provider?: string; video_model?: string }) =>
+    http.put<BillingStatus>('/api/billing/prefs', data).then((r) => r.data),
+  saveCredential: (data: { provider: string; api_key: string; base_url?: string }) =>
+    http.put<{ ok: boolean; credential: BillingCredential }>('/api/billing/credentials', data).then((r) => r.data),
+  deleteCredential: (provider: string) =>
+    http.delete<{ ok: boolean; deleted: boolean }>(`/api/billing/credentials/${provider}`).then((r) => r.data),
+  ledger: (limit = 12) =>
+    http.get<{ items: BillingLedgerItem[] }>('/api/billing/ledger', { params: { limit } }).then((r) => r.data),
+  recharge: (data: { package_id?: string; yuan?: number }) =>
+    http.post<BillingStatus>('/api/billing/recharge', data).then((r) => r.data),
+};
 
 // ---- 版本控制 ----
 
@@ -657,22 +740,83 @@ export interface TokenResponse {
 
 // ---- Axios 实例 ----
 
+export function getAccessToken(): string | null {
+  return localStorage.getItem('vf_token');
+}
+
+/** 给 /storage 资源补上 access_token，供 <img>/<video> 在生产受控访问。 */
+export function mediaUrl(path: string): string {
+  if (!path) return path;
+  if (path.startsWith('data:') || path.startsWith('blob:')) return path;
+  const token = getAccessToken();
+  if (!token) return path;
+  try {
+    const url = new URL(path, window.location.origin);
+    const managed = url.pathname.startsWith('/storage/') || url.pathname.startsWith('/api/director/assets/');
+    if (!managed) return path;
+    if (!url.searchParams.has('access_token')) url.searchParams.set('access_token', token);
+    return `${url.pathname}${url.search}`;
+  } catch {
+    return path;
+  }
+}
+
 const http = axios.create({ baseURL: '' });
 
-// 请求拦截器:自动附加 Authorization 头
-http.interceptors.request.use((config) => {
+export { http as apiHttp };
+
+// 请求拦截器:自动附加 Authorization 头；导演台接口补上 project_id
+http.interceptors.request.use(async (config) => {
   const token = localStorage.getItem('vf_token');
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
   }
+  const url = String(config.url || '');
+  if (url.includes('/api/director')) {
+    const params = { ...(config.params || {}) };
+    let pid = String(params.project_id || '').trim();
+    if (!pid) {
+      const scope = await import('../director/scope');
+      pid = scope.getDirectorProjectId();
+      if (!pid && token) {
+        try {
+          pid = await scope.ensureDirectorProject();
+        } catch {
+          pid = '';
+        }
+      }
+    }
+    if (pid) {
+      params.project_id = pid;
+      config.params = params;
+    }
+  }
   return config;
 });
 
-// 响应拦截器:401 跳转登录
+// 只在会话真的失效时回登录。业务 401（密码错、模型余额不足）不得清登录态。
+const AUTH_LOST = new Set([
+  '未提供认证信息',
+  '认证信息无效或已过期',
+  '认证信息无效',
+  '用户不存在',
+]);
+
 http.interceptors.response.use(
   (res) => res,
   (error) => {
-    if (error?.response?.status === 401) {
+    const status = error?.response?.status;
+    const url = String(error?.config?.url || '');
+    const detail = error?.response?.data?.detail;
+    const authEndpoint = /\/api\/auth\/(login|login-sms|register|send-code|reset-password|captcha)/.test(url);
+    const optionalAuth = /\/api\/billing\//.test(url);
+    if (
+      status === 401
+      && !authEndpoint
+      && !optionalAuth
+      && typeof detail === 'string'
+      && AUTH_LOST.has(detail)
+    ) {
       localStorage.removeItem('vf_token');
       localStorage.removeItem('vf_user');
       if (window.location.pathname !== '/login') {
@@ -686,12 +830,35 @@ http.interceptors.response.use(
 // ---- Auth API ----
 
 export const authApi = {
-  register: (email: string, password: string, displayName?: string) =>
-    http.post<TokenResponse>('/api/auth/register', {
-      email, password, display_name: displayName || '',
-    }).then((r) => r.data),
-  login: (email: string, password: string) =>
-    http.post<TokenResponse>('/api/auth/login', { email, password }).then((r) => r.data),
+  status: () => http.get<AuthStatus>('/api/auth/status').then((r) => r.data),
+  captcha: () => http.get<CaptchaResp>('/api/auth/captcha').then((r) => r.data),
+  sendCode: (data: { account: string; purpose: 'register' | 'login' | 'reset'; captcha_id: string; captcha_code: string }) =>
+    http.post<SendCodeResp>('/api/auth/send-code', data).then((r) => r.data),
+  register: (data: {
+    account: string;
+    password: string;
+    display_name?: string;
+    captcha_id: string;
+    captcha_code: string;
+    verify_code?: string;
+    agree: boolean;
+  }) => http.post<TokenResponse>('/api/auth/register', data).then((r) => r.data),
+  login: (data: {
+    account: string;
+    password: string;
+    captcha_id: string;
+    captcha_code: string;
+    remember?: boolean;
+  }) => http.post<TokenResponse>('/api/auth/login', data).then((r) => r.data),
+  loginSms: (data: {
+    account: string;
+    verify_code: string;
+    captcha_id: string;
+    captcha_code: string;
+    remember?: boolean;
+  }) => http.post<TokenResponse>('/api/auth/login-sms', data).then((r) => r.data),
+  resetPassword: (data: { account: string; verify_code: string; password: string }) =>
+    http.post<{ ok: boolean; message: string }>('/api/auth/reset-password', data).then((r) => r.data),
   me: () =>
     http.get<UserOut>('/api/auth/me').then((r) => r.data),
 };

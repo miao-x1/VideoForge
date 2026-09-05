@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { Component, lazy, Suspense, useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
-import { Layout, Typography, message, Spin, Tag, Steps, Empty, Tabs } from 'antd';
+import { Layout, Typography, message, Spin, Steps, Empty, Tabs } from 'antd';
 import CreativeBrief, { CreativeBriefValue } from './components/CreativeBrief';
 import IntentReview from './components/IntentReview';
 import ScriptReview from './components/ScriptReview';
@@ -27,6 +27,34 @@ import UserMenu from './components/UserMenu';
 import AIPlanPanel from './components/AIPlanPanel';
 import LoginPage from './pages/LoginPage';
 import HistoryPage from './pages/HistoryPage';
+import MarketplaceStubPage from './pages/MarketplaceStubPage';
+
+const DirectorDeskPage = lazy(() => import('./director/DirectorDeskPage'));
+
+class DeskGuard extends Component<{ children: ReactNode }, { error: string | null }> {
+  state = { error: null as string | null };
+  static getDerivedStateFromError(error: Error) {
+    return { error: error?.message || '导演台渲染失败' };
+  }
+  render() {
+    if (this.state.error) {
+      return (
+        <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#0e0d0b', color: '#f4f1ea', flexDirection: 'column', gap: 12, padding: 24 }}>
+          <div style={{ fontWeight: 700 }}>导演台打不开</div>
+          <div style={{ fontSize: 12, color: '#8a8680', maxWidth: 520, textAlign: 'center' }}>{this.state.error}</div>
+          <button
+            type="button"
+            onClick={() => window.location.reload()}
+            style={{ padding: '6px 12px', borderRadius: 6, border: '1px solid #c7b89c', background: 'transparent', color: '#c7b89c', cursor: 'pointer' }}
+          >
+            刷新重试
+          </button>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
 import { useAuth } from './hooks/useAuth';
 import { useCreativeStore } from './store/useCreativeStore';
 import { api, subscribeTask } from './api/client';
@@ -651,14 +679,12 @@ function StudioPage() {
           }}
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-            <PageTitle level={4} style={{ margin: 0 }}>项目工作台</PageTitle>
-            <Tag color="purple" style={{ fontSize: 12 }}>AI 漫剧专业创作工作台</Tag>
+            <PageTitle level={4} style={{ margin: 0, fontWeight: 500, letterSpacing: '0.06em' }}>项目工作台</PageTitle>
           </div>
           <UserMenu />
         </Header>
         <Content style={{ padding: 24, overflow: 'auto' }}>
           <WorkspacePage
-            onNewCreation={() => setStage('brief')}
             onOpenTask={(id) => restoreTask(id)}
           />
         </Content>
@@ -683,12 +709,10 @@ function StudioPage() {
           }}
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-            <PageTitle level={4} style={{ margin: 0 }}>
+            <PageTitle level={4} style={{ margin: 0, fontWeight: 500, letterSpacing: '0.06em' }}>
               创作工作台
             </PageTitle>
-            <Tag color="purple" style={{ fontSize: 12 }}>
-              AI 漫剧专业创作工作台
-            </Tag>
+            <span style={{ fontSize: 12, color: colors.textMuted, letterSpacing: '0.08em' }}>AI 影视创作</span>
           </div>
           <UserMenu />
         </Header>
@@ -960,8 +984,11 @@ export default function App() {
     <Routes>
       <Route path="/login" element={<LoginPage />} />
       <Route path="/history" element={<ProtectedRoute><HistoryPage /></ProtectedRoute>} />
-      <Route path="/" element={<ProtectedRoute><StudioPage /></ProtectedRoute>} />
-      <Route path="*" element={<Navigate to="/" replace />} />
+      <Route path="/director" element={<ProtectedRoute><Suspense fallback={<div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Spin size="large" /></div>}><DeskGuard><DirectorDeskPage /></DeskGuard></Suspense></ProtectedRoute>} />
+      <Route path="/director/marketplace" element={<ProtectedRoute><MarketplaceStubPage /></ProtectedRoute>} />
+      <Route path="/" element={<ProtectedRoute><Navigate to="/director" replace /></ProtectedRoute>} />
+      <Route path="/studio" element={<ProtectedRoute><StudioPage /></ProtectedRoute>} />
+      <Route path="*" element={<Navigate to="/director" replace />} />
     </Routes>
   );
 }

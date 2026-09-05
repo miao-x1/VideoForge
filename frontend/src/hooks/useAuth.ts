@@ -1,8 +1,13 @@
 import { useCallback, useEffect, useState } from 'react';
-import { authApi, type UserOut } from '../api/client';
+import { authApi, type TokenResponse, type UserOut } from '../api/client';
 
 const TOKEN_KEY = 'vf_token';
 const USER_KEY = 'vf_user';
+
+function persistAuth(resp: TokenResponse) {
+  localStorage.setItem(TOKEN_KEY, resp.access_token);
+  localStorage.setItem(USER_KEY, JSON.stringify(resp.user));
+}
 
 export function useAuth() {
   const [user, setUser] = useState<UserOut | null>(null);
@@ -19,10 +24,12 @@ export function useAuth() {
     if (token) {
       authApi.me()
         .then((u) => { setUser(u); localStorage.setItem(USER_KEY, JSON.stringify(u)); })
-        .catch(() => {
-          localStorage.removeItem(TOKEN_KEY);
-          localStorage.removeItem(USER_KEY);
-          setUser(null);
+        .catch((err: { response?: { status?: number } }) => {
+          if (err?.response?.status === 401) {
+            localStorage.removeItem(TOKEN_KEY);
+            localStorage.removeItem(USER_KEY);
+            setUser(null);
+          }
         })
         .finally(() => setLoading(false));
     } else {
@@ -30,18 +37,8 @@ export function useAuth() {
     }
   }, []);
 
-  const login = useCallback(async (email: string, password: string) => {
-    const resp = await authApi.login(email, password);
-    localStorage.setItem(TOKEN_KEY, resp.access_token);
-    localStorage.setItem(USER_KEY, JSON.stringify(resp.user));
-    setUser(resp.user);
-    return resp;
-  }, []);
-
-  const register = useCallback(async (email: string, password: string, displayName?: string) => {
-    const resp = await authApi.register(email, password, displayName);
-    localStorage.setItem(TOKEN_KEY, resp.access_token);
-    localStorage.setItem(USER_KEY, JSON.stringify(resp.user));
+  const applyAuth = useCallback((resp: TokenResponse) => {
+    persistAuth(resp);
     setUser(resp.user);
     return resp;
   }, []);
@@ -53,5 +50,5 @@ export function useAuth() {
     window.location.href = '/login';
   }, []);
 
-  return { user, loading, login, register, logout };
+  return { user, loading, applyAuth, logout };
 }

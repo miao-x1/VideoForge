@@ -1,16 +1,16 @@
 import { useCallback, useEffect, useState } from 'react';
 import {
-  Button, Card, Empty, List, message, Popconfirm, Spin, Tag, Typography,
+  Button, Card, Empty, List, message, Popconfirm, Space, Spin, Tag, Typography,
 } from 'antd';
 import {
-  PlusOutlined, PlayCircleOutlined, FolderOpenOutlined, DeleteOutlined,
+  PlayCircleOutlined, FolderOpenOutlined, DeleteOutlined,
   ReloadOutlined, VideoCameraOutlined,
 } from '@ant-design/icons';
 import { api } from '../api/client';
 import type { ProjectDetail, ProjectInfo, ProjectTaskBrief, TaskBrief, TaskStatus } from '../api/client';
 import { cardStyle, colors } from '../theme';
 
-const { Title, Paragraph, Text } = Typography;
+const { Paragraph, Text } = Typography;
 
 /** 任务状态 → 中文标签与颜色 */
 const STATUS_META: Record<TaskStatus, { label: string; color: string }> = {
@@ -47,7 +47,7 @@ function formatTime(ts: number): string {
 }
 
 interface Props {
-  onNewCreation: () => void;
+  onNewCreation?: () => void;
   onOpenTask: (taskId: string) => void;
 }
 
@@ -58,7 +58,7 @@ interface Props {
  * - 最近作品(项目卡片,展开查看集内任务)
  * - 最近任务
  */
-export default function WorkspacePage({ onNewCreation, onOpenTask }: Props) {
+export default function WorkspacePage({ onOpenTask }: Props) {
   const [loading, setLoading] = useState(true);
   const [tasks, setTasks] = useState<TaskBrief[]>([]);
   const [projects, setProjects] = useState<ProjectInfo[]>([]);
@@ -133,7 +133,7 @@ export default function WorkspacePage({ onNewCreation, onOpenTask }: Props) {
         }}
         onClick={() => onOpenTask(t.task_id)}
       >
-        <VideoCameraOutlined style={{ fontSize: 16, color: '#8b5cf6', flexShrink: 0 }} />
+        <VideoCameraOutlined style={{ fontSize: 16, color: '#8f7350', flexShrink: 0 }} />
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <Text ellipsis style={{ flex: 1, fontSize: 13 }}>
@@ -155,22 +155,6 @@ export default function WorkspacePage({ onNewCreation, onOpenTask }: Props) {
 
   return (
     <div style={{ maxWidth: 1080, margin: '0 auto', width: '100%' }}>
-      {/* 新建作品 */}
-      <Card style={{ ...cardStyle, marginBottom: 16, textAlign: 'center', padding: 8 }}>
-        <Title level={3} style={{ marginBottom: 4 }}>开始一个新的作品</Title>
-        <Paragraph type="secondary" style={{ marginBottom: 16 }}>
-          输入你的创意,AI 将生成创作方案、作品设定、剧本与分镜,逐步确认后产出成片
-        </Paragraph>
-        <Button
-          type="primary"
-          size="large"
-          icon={<PlusOutlined />}
-          onClick={onNewCreation}
-        >
-          新建作品
-        </Button>
-      </Card>
-
       {loading ? (
         <div style={{ textAlign: 'center', padding: 60 }}>
           <Spin size="large" />
@@ -202,7 +186,7 @@ export default function WorkspacePage({ onNewCreation, onOpenTask }: Props) {
             {projects.length === 0 ? (
               <Empty
                 image={Empty.PRESENTED_IMAGE_SIMPLE}
-                description="还没有作品,从上面的「新建作品」开始"
+                description="还没有作品"
               />
             ) : (
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: 12 }}>
@@ -218,7 +202,7 @@ export default function WorkspacePage({ onNewCreation, onOpenTask }: Props) {
                     >
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
                         <Text strong style={{ flex: 1 }} ellipsis>{p.title}</Text>
-                        {p.is_series && <Tag color="purple" style={{ marginRight: 0 }}>系列</Tag>}
+                        {p.is_series && <Tag style={{ marginRight: 0 }}>系列</Tag>}
                         <Popconfirm
                           title="删除作品"
                           description="删除作品不删除其任务记录,确定删除?"

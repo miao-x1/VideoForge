@@ -3,7 +3,7 @@ import { Tooltip } from 'antd';
 import {
   FolderOpenOutlined, HistoryOutlined, HomeOutlined,
 } from '@ant-design/icons';
-import { brand, colors, radius } from '../theme';
+import { colors, radius } from '../theme';
 
 /**
  * 工作区视图键:
@@ -49,12 +49,12 @@ export default function NodeNav({ active, available, onSelect, onBackHome }: Pro
           padding: '8px 12px',
           borderRadius: radius.control,
           cursor: isEnabled ? 'pointer' : 'not-allowed',
-          background: isActive ? brand.tint : 'transparent',
+          background: isActive ? 'rgba(199, 184, 156, 0.14)' : 'transparent',
           color: !isEnabled
-            ? 'rgba(255,255,255,0.25)'
+            ? 'rgba(244,241,234,0.22)'
             : isActive
-              ? '#fff'
-              : 'rgba(255,255,255,0.65)',
+              ? '#c7b89c'
+              : 'rgba(244,241,234,0.62)',
           fontSize: 13,
           transition: 'all 0.2s',
           marginBottom: 2,
@@ -82,21 +82,22 @@ export default function NodeNav({ active, available, onSelect, onBackHome }: Pro
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 20 }}>
         <div
           style={{
-            width: 32,
-            height: 32,
-            borderRadius: radius.item,
-            background: brand.gradient,
+            width: 28,
+            height: 28,
+            borderRadius: 6,
+            border: '1px solid rgba(199, 184, 156, 0.35)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            color: '#fff',
-            fontSize: 15,
-            fontWeight: 'bold',
+            color: '#c7b89c',
+            fontSize: 10,
+            letterSpacing: '0.04em',
+            fontWeight: 500,
           }}
         >
-          V
+          VF
         </div>
-        <span style={{ color: '#fff', fontWeight: 600, fontSize: 14 }}>VideoForge</span>
+        <span style={{ color: '#f4f1ea', fontWeight: 500, fontSize: 13, letterSpacing: '0.08em' }}>VIDEOFORGE</span>
       </div>
 
       {/* 返回工作台 */}
@@ -145,8 +146,8 @@ export default function NodeNav({ active, available, onSelect, onBackHome }: Pro
             height: 36,
             borderRadius: radius.control,
             cursor: 'pointer',
-            background: location.pathname === '/history' ? brand.tint : 'transparent',
-            color: 'rgba(255,255,255,0.6)',
+            background: location.pathname === '/history' ? 'rgba(199, 184, 156, 0.14)' : 'transparent',
+            color: location.pathname === '/history' ? '#c7b89c' : 'rgba(244,241,234,0.62)',
             fontSize: 15,
           }}
         >

@@ -32,6 +32,28 @@ async def get_current_user(
     return user
 
 
+async def get_current_user_from_header_or_query(
+    creds: HTTPAuthorizationCredentials | None = Depends(bearer_scheme),
+    access_token: str | None = Query(default=None),
+    db: AsyncSession = Depends(get_db),
+) -> User:
+    """<img> / 3D 贴图只能带 query token，不能设 Authorization。"""
+    token = (creds.credentials if creds is not None else "") or (access_token or "")
+    if not token:
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "未提供认证信息")
+    payload = verify_token(token)
+    if payload is None:
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "认证信息无效或已过期")
+    user_id = payload.get("sub")
+    if not user_id:
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "认证信息无效")
+    result = await db.execute(select(User).where(User.id == user_id))
+    user = result.scalar_one_or_none()
+    if user is None:
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "用户不存在")
+    return user
+
+
 async def get_current_user_sse(
     token: str = Query(..., description="JWT token (EventSource 无法设置头)"),
     db: AsyncSession = Depends(get_db),

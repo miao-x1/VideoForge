@@ -262,7 +262,7 @@ async def list_assets(
 ) -> dict:
     """列出用户素材库。"""
     with get_session() as session:
-        query = select(Asset).where(Asset.user_id == user.id)
+        query = select(Asset).where(Asset.user_id == user.id, Asset.deleted_at.is_(None), Asset.status != "deleted")
         if asset_type:
             query = query.where(Asset.asset_type == asset_type)
         if project_id:
@@ -300,11 +300,18 @@ async def delete_asset(
                 Asset.user_id == user.id,
             )
         )
-        if not asset:
+        if not asset or asset.deleted_at is not None or asset.status == "deleted":
             raise HTTPException(404, "素材不存在")
-        session.delete(asset)
+        if asset.thumbnail_asset_id == asset.id:
+            raise HTTPException(409, "素材仍被引用")
+        others = session.scalars(select(Asset).where(Asset.thumbnail_asset_id == asset.id, Asset.id != asset.id)).first()
+        if others:
+            raise HTTPException(409, "素材仍被引用")
+        from datetime import datetime, timezone
+        asset.status = "deleted"
+        asset.deleted_at = datetime.now(timezone.utc).timestamp()
         session.commit()
-        return {"deleted": True, "id": asset_id}
+        return {"deleted": True, "id": asset_id, "status": "deleted"}
 
 
 # ======================== Generation History ========================
